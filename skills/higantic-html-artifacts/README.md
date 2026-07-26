@@ -10,7 +10,15 @@ Install this skill from the public HiGantic skills collection:
 npx skills add Aneaire/higantic-skills --skill higantic-html-artifacts
 ```
 
-For a global installation, add `--global`. The installed skill is self-contained and supports coding agents recognized by the `skills` CLI.
+For a global installation, add `--global`. The installed payload is self-contained and contains only `SKILL.md`, `README.md`, runtime `scripts/`, and bundled `references/`.
+
+## Live product reference
+
+Before using the product workflow, run `python3 scripts/fetch_live_reference.py` and read its locally rendered stdout. The fetcher loads installed version and exact endpoints from `references/live-reference.json`, then requests only `https://skills.higantic.com/v1/manifest.json` and `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`. It disables environment proxies, sends no API key, cookies, Authorization header, or environment-derived headers, and never prints remote bytes or executes remote content.
+
+The remote reference is closed-schema JSON with no descriptions, notes, Markdown, URLs, shell commands, or arbitrary strings. Validation covers duplicate keys, ASCII-only constrained values, local capability/command/scope allowlists, exact fields and types, booleans, nonnegative integer limits, timestamps, versions, exact origin/path, redirects, 64 KiB bounds, and SHA-256 consistency. Trusted local code renders only fixed explanations selected by known identifiers and constrained values.
+
+Network or validation failure renders `references/live-reference-fallback.json` through the same local renderer. If `minimumInstalledVersion` exceeds the version in `references/live-reference.json`, the fallback is rendered and the script exits `3` with `npx skills update higantic-html-artifacts` guidance. Local `SKILL.md` safety, approval, credential, destination, destructive-action, and sharing rules remain authoritative.
 
 Set credentials only in the coding agent's process environment:
 

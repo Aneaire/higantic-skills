@@ -10,6 +10,14 @@ Creates and maintains safe, versioned, static HTML artifacts when a user explici
 
 The included dependency-free Python CLI supports stable page and artifact identity, optimistic concurrency, managed images, explicit deletion safeguards, and opt-in capability sharing.
 
+## Branded live references
+
+Installed skills can read current product state without accepting mutable remote prose or instructions. The maintained source manifest is `site/v1/manifest.source.json`; the deterministic build publishes `https://skills.higantic.com/v1/manifest.json` and the closed-schema HTML Artifacts reference at `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`.
+
+Each manifest-declared skill packages `scripts/fetch_live_reference.py`, `references/live-reference.json`, and `references/live-reference-fallback.json`. The canonical local config supplies that skill's installed version and exact URLs. The dependency-free fetcher disables environment proxies, sends no API key, cookies, Authorization header, or environment-derived headers, and validates exact paths, same-origin redirect policy, 64 KiB size limits, duplicate keys, ASCII-only constrained strings, fixed identifier allowlists, booleans, nonnegative integer limits, timestamps, semantic versions, and SHA-256 consistency. Remote bytes are never printed. Trusted installed code renders validated state through fixed local text; failures render the structured bundled fallback through the same renderer.
+
+The source manifest and generated manifest are each limited to 64 KiB, as is every source/generated reference. Live structured state cannot override installed `SKILL.md` safety, approval, credential, destination, destructive-action, or sharing rules. A newer executable contract requires `npx skills update <skill-slug>`. This convention is required for future skills, while installable payloads remain limited to `SKILL.md`, `README.md`, `scripts/`, and `references/`.
+
 ## Install with skills.sh
 
 The permanent source for this collection is `Aneaire/higantic-skills`. The commands below use the `skills` CLI through `npx`; this repository does not claim or require a separately published HiGantic npm package.
@@ -112,10 +120,16 @@ Review upstream changes and rerun your repository's checks before relying on a n
 Run the complete local validation suite from the repository root:
 
 ```bash
+node scripts/build-site.mjs
+node scripts/test-site.mjs
 python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
-python3 -m py_compile skills/higantic-html-artifacts/scripts/higantic_html.py scripts/validate_repository.py tests/higantic-html-artifacts/test_higantic_html.py
-python3 -m json.tool skills.sh.json >/dev/null
-python3 -m json.tool evals/higantic-html-artifacts/evals.json >/dev/null
+python3 -m py_compile skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/higantic-html-artifacts/*.py
+python3 -m json.tool site/v1/manifest.source.json >/dev/null
+python3 -m json.tool site/v1/references/higantic-html-artifacts.json >/dev/null
+python3 -m json.tool skills/higantic-html-artifacts/references/live-reference.json >/dev/null
+python3 -m json.tool skills/higantic-html-artifacts/references/live-reference-fallback.json >/dev/null
+python3 -m json.tool dist/v1/manifest.json >/dev/null
+python3 -m json.tool dist/v1/references/higantic-html-artifacts.json >/dev/null
 python3 scripts/validate_repository.py
 ```
 

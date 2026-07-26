@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Replaced agent-consumed mutable Markdown with closed-schema structured JSON at `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`; remote bytes and arbitrary prose are never printed, and fixed installed renderer text remains subordinate to local skill safeguards.
+- Added canonical per-skill `references/live-reference.json` configuration, structured fallback rendering, duplicate-key/ASCII/Unicode/allowlist/type/path/version/size validation, and SHA-256 consistency checking without authentication claims.
+- Enforced matching 64 KiB publisher/client limits for source/generated manifests and references, deterministic oversize build tests, behavior-based repository validation, mocked-network/config/Unicode/rendering tests, Node 24 CI coverage, and the reusable convention for future skills.
 - Hardened API destination validation and redirect handling for bearer credentials.
 - Reject unsafe or recursively encoded resource path segments before any API request.
 - Kept maintainer-only tests and evals outside the installable skill payload.

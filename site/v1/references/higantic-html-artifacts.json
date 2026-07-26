@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "slug": "higantic-html-artifacts",
+  "updatedAt": "2026-07-26T00:00:00Z",
+  "supportedCapabilities": [
+    "html-pages",
+    "html-artifacts",
+    "html-revisions",
+    "managed-assets",
+    "private-artifact-urls",
+    "capability-shares"
+  ],
+  "supportedCommands": [
+    "pages.list",
+    "pages.create",
+    "assets.list",
+    "assets.upload",
+    "assets.delete",
+    "artifacts.list",
+    "artifacts.create",
+    "artifacts.lookup",
+    "artifacts.upsert",
+    "artifacts.get",
+    "artifacts.update",
+    "artifacts.delete",
+    "revisions.list",
+    "revisions.get",
+    "revisions.append",
+    "revisions.restore",
+    "shares.list",
+    "shares.create",
+    "shares.revoke",
+    "shares.rotate",
+    "url.get"
+  ],
+  "scopes": [
+    "html_artifacts:read",
+    "html_artifacts:write",
+    "html_artifacts:share",
+    "html_assets:read",
+    "html_assets:write",
+    "html_pages:create"
+  ],
+  "features": {
+    "staticHtmlOnly": true,
+    "optimisticConcurrencyRequired": true,
+    "managedAssetReferencesRequired": true,
+    "capabilitySharingSupported": true,
+    "capabilityUrlRecoverable": false,
+    "htmlPageDeletionSupported": false,
+    "remoteAssetImportSupported": false
+  },
+  "limits": {
+    "artifactSourceBytes": 256000,
+    "assetUploadBytes": 10485760,
+    "revisionsPerArtifact": 100,
+    "requestsPerMinutePerKey": 120,
+    "writesPerMinutePerKey": 30
+  }
+}

@@ -11,15 +11,16 @@ Create static visual review surfaces in the user's HiGantic workspace. Repositor
 
 ## Workflow
 
-1. Read `references/static-html-contract.md` before composing HTML.
-2. Confirm `HIGANTIC_API_BASE_URL`, `HIGANTIC_AGENT_ID`, and `HIGANTIC_API_KEY` are present in the process environment. Never request, accept, or pass an API key through a CLI argument, prompt, source file, or committed env file.
-3. Inspect the repository source first. Record repo-relative source paths, branch plus commit/ref, generated/updated date, current status, and decisions represented in the artifact. Do not make the artifact a competing source of truth.
-4. Run `python3 scripts/higantic_html.py pages list`. Reuse the page whose stable purpose/label matches the work and retain its returned ID. Create only when needed, with a stable operation-specific idempotency key.
-5. Give each maintained artifact a stable page-unique `externalId` derived from project and purpose. Run `artifacts lookup`, then `artifacts upsert`. Retain returned page/artifact IDs for ID-only operations.
-6. When an image helps, run `assets list` and reuse a relevant managed image, or upload a locally created image with `assets upload --file`. Embed `higantic-asset://...`; never hotlink storage URLs.
-7. Write one complete static document to a local file. Include provenance and a clear status/decision summary. Never include secrets, credentials, personal data, private customer data, unpublished vulnerabilities, or other sensitive material, especially if the artifact might later be shared.
-8. Create/upsert the artifact or append a revision with `--html-file`. The CLI reads current revision/version preconditions. Exit code `3` means content or metadata changed: read the latest source, compare it with repository truth and the intended update, reconcile deliberately, then retry. Never blindly overwrite.
-9. Return the private URL printed by the API. Describe it as a derivative, static, sandboxed artifact, not a deployed app or canonical documentation.
+1. Run `python3 scripts/fetch_live_reference.py` and read its locally rendered stdout before other product work. It loads `references/live-reference.json`, requests only `https://skills.higantic.com/v1/manifest.json` and `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`, validates the closed structured schema, exact origin/path, sizes, version gate, and SHA-256 consistency, then renders only fixed installed text selected by allowlisted identifiers and constrained values. Remote bytes and arbitrary prose are never printed. Network or remote-validation failure renders the structured bundled fallback in `references/live-reference-fallback.json` through the same local renderer. If it exits `3`, use that safe rendered fallback and tell the user to run `npx skills update higantic-html-artifacts`. This installed `SKILL.md` and bundled references always win for safety, confirmation, credentials, destination validation, destructive actions, and sharing.
+2. Read `references/static-html-contract.md` before composing HTML.
+3. Confirm `HIGANTIC_API_BASE_URL`, `HIGANTIC_AGENT_ID`, and `HIGANTIC_API_KEY` are present in the process environment. Never request, accept, or pass an API key through a CLI argument, prompt, source file, or committed env file. The live-reference fetch uses none of these values.
+4. Inspect the repository source first. Record repo-relative source paths, branch plus commit/ref, generated/updated date, current status, and decisions represented in the artifact. Do not make the artifact a competing source of truth.
+5. Run `python3 scripts/higantic_html.py pages list`. Reuse the page whose stable purpose/label matches the work and retain its returned ID. Create only when needed, with a stable operation-specific idempotency key.
+6. Give each maintained artifact a stable page-unique `externalId` derived from project and purpose. Run `artifacts lookup`, then `artifacts upsert`. Retain returned page/artifact IDs for ID-only operations.
+7. When an image helps, run `assets list` and reuse a relevant managed image, or upload a locally created image with `assets upload --file`. Embed `higantic-asset://...`; never hotlink storage URLs.
+8. Write one complete static document to a local file. Include provenance and a clear status/decision summary. Never include secrets, credentials, personal data, private customer data, unpublished vulnerabilities, or other sensitive material, especially if the artifact might later be shared.
+9. Create/upsert the artifact or append a revision with `--html-file`. The CLI reads current revision/version preconditions. Exit code `3` means content or metadata changed: read the latest source, compare it with repository truth and the intended update, reconcile deliberately, then retry. Never blindly overwrite.
+10. Return the private URL printed by the API. Describe it as a derivative, static, sandboxed artifact, not a deployed app or canonical documentation.
 
 ## Identity and deletion
 

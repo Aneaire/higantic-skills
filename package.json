@@ -1,0 +1,9 @@
+{
+  "name": "higantic-skills-live-references",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "test:site": "node scripts/test-site.mjs",
+    "validate": "node scripts/build-site.mjs && node scripts/test-site.mjs && python3 scripts/validate_repository.py"
+  }
+}

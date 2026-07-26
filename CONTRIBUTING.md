@@ -14,6 +14,16 @@ Each skill belongs in `skills/<skill-name>/` and must include a `SKILL.md` file 
 
 Prefer a concise operational `SKILL.md`. Put detailed background, API behavior, and content contracts in `references/` so agents load them only when needed.
 
+## Live-reference convention
+
+Every skill added to `site/v1/manifest.source.json` must include dependency-free `scripts/fetch_live_reference.py`, canonical `references/live-reference.json`, and structured `references/live-reference-fallback.json`; its `SKILL.md` must run/read the locally rendered reference first. The deterministic build publishes `https://skills.higantic.com/v1/manifest.json` and `https://skills.higantic.com/v1/references/<skill-slug>.json`. Alternate origins, userinfo, queries, fragments, cross-origin redirects, agent-consumed remote Markdown, and remote prose or instructions are forbidden.
+
+Remote reference schemas must be exact and closed: schema version, slug, UTC timestamp, supported capability/command identifiers selected from fixed local allowlists, fixed scope identifiers, exact boolean feature fields, and exact nonnegative safe-integer limits. Do not add descriptions, notes, URLs, commands to execute, arbitrary strings, unknown keys, or extensible metadata. Reject duplicate keys, non-ASCII and concealed Unicode, malformed data, and unknown identifiers.
+
+The source/generated manifests and every source/generated reference must fit the fetcher's exact 64 KiB client limits. Fetchers load per-skill installed version and exact URLs from `references/live-reference.json`; never hard-code a repository-wide version in validator logic. Fetchers disable environment proxies, send no credentials or environment-derived headers, perform SHA-256 consistency checking, never print remote bytes, and render through fixed installed text. Network or remote-validation failures render the bundled structured fallback through that same renderer. Installed safety, confirmation, credential, destination, destructive-action, and sharing rules always remain authoritative.
+
+Keep the released source reference and bundled fallback identical. Bump `minimumInstalledVersion` only when state depends on newer installed executable behavior. Maintainer tests belong under `tests/<skill-name>/`, never inside the installable payload.
+
 ## Changes
 
 1. Make the smallest change that preserves existing public behavior.
@@ -28,10 +38,16 @@ Prefer a concise operational `SKILL.md`. Put detailed background, API behavior, 
 Run from the repository root:
 
 ```bash
+node scripts/build-site.mjs
+node scripts/test-site.mjs
 python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
-python3 -m py_compile skills/higantic-html-artifacts/scripts/higantic_html.py scripts/validate_repository.py tests/higantic-html-artifacts/test_higantic_html.py
-python3 -m json.tool skills.sh.json >/dev/null
-python3 -m json.tool evals/higantic-html-artifacts/evals.json >/dev/null
+python3 -m py_compile skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/higantic-html-artifacts/*.py
+python3 -m json.tool site/v1/manifest.source.json >/dev/null
+python3 -m json.tool site/v1/references/higantic-html-artifacts.json >/dev/null
+python3 -m json.tool skills/higantic-html-artifacts/references/live-reference.json >/dev/null
+python3 -m json.tool skills/higantic-html-artifacts/references/live-reference-fallback.json >/dev/null
+python3 -m json.tool dist/v1/manifest.json >/dev/null
+python3 -m json.tool dist/v1/references/higantic-html-artifacts.json >/dev/null
 python3 scripts/validate_repository.py
 ```
 
