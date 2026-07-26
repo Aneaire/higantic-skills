@@ -1,0 +1,39 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.x"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
+
+      - name: Compile Python files
+        run: python3 -m py_compile skills/higantic-html-artifacts/scripts/higantic_html.py scripts/validate_repository.py tests/higantic-html-artifacts/test_higantic_html.py
+
+      - name: Validate JSON
+        run: |
+          python3 -m json.tool skills.sh.json >/dev/null
+          python3 -m json.tool evals/higantic-html-artifacts/evals.json >/dev/null
+
+      - name: Validate repository structure
+        run: python3 scripts/validate_repository.py
