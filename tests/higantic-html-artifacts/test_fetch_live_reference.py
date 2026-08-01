@@ -253,6 +253,9 @@ class LiveReferenceTests(unittest.TestCase):
         self.assertEqual(rendered, MODULE.render_reference(reordered))
         self.assertIn("trusted installed code", rendered)
         self.assertIn("Artifact content is static HTML only: yes.", rendered)
+        self.assertIn("visibility get", rendered)
+        self.assertIn("visibility set", rendered)
+        self.assertIn("Stable current-revision public visibility", rendered)
         self.assertNotIn("supportedCapabilities", rendered)
         self.assertNotIn("{", rendered)
 

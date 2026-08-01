@@ -9,6 +9,7 @@
 - Reject unsafe or recursively encoded resource path segments before any API request.
 - Kept maintainer-only tests and evals outside the installable skill payload.
 - Narrowed skill activation to explicit HiGantic destinations and management requests.
+- Bound public-content replacement confirmation and artifact-version preconditions to the backend write, and switched artifact/revision links to API-returned dedicated viewer URLs.
 
 ## Initial public release — 2026-07-26
 

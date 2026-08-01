@@ -18,7 +18,7 @@ Scopes:
 
 - `html_artifacts:read`: list pages/artifacts/revisions and read source.
 - `html_artifacts:write`: create, update, revise, restore, and delete artifacts.
-- `html_artifacts:share`: list/create/revoke/rotate capability shares; high-trust, non-default scope.
+- `html_artifacts:share`: publish/unpublish stable visibility and list/create/revoke/rotate pinned capability shares; high-trust, non-default scope.
 - `html_assets:read`: list managed images.
 - `html_assets:write`: upload and delete managed images.
 - `html_pages:create`: create HTML Artifact pages.
@@ -35,6 +35,7 @@ Routes:
 - `GET|POST /html-pages/{pageId}/artifacts/{artifactId}/revisions`
 - `GET /html-pages/{pageId}/artifacts/{artifactId}/revisions/{revision}`
 - `POST /html-pages/{pageId}/artifacts/{artifactId}/revisions/{revision}/restore`
+- `GET|PUT /html-pages/{pageId}/artifacts/{artifactId}/visibility`
 - `GET|POST /html-pages/{pageId}/artifacts/{artifactId}/shares`
 - `DELETE /html-pages/{pageId}/artifacts/{artifactId}/shares/{shareId}`
 - `POST /html-pages/{pageId}/artifacts/{artifactId}/shares/{shareId}/rotate`
@@ -47,7 +48,9 @@ Before constructing any resource path, the CLI validates agent, page, artifact, 
 
 Page and artifact create calls may send a 1–255 visible-ASCII `Idempotency-Key`. An exact replay returns the original resource; reuse with different input returns `idempotency_conflict`. Use idempotency only for transport retries. It does not replace stable page selection or artifact `externalId`.
 
-Append, restore, and external-ID upsert require `expectedCurrentRevision`. Metadata `PATCH` and upsert also require `expectedArtifactVersion`. Use both as zero only when external-ID lookup returned 404 and the upsert will create. Stale content returns `revision_conflict`; stale metadata returns `artifact_version_conflict`. The CLI exits `3`: re-read repository and artifact state, compare changes, reconcile deliberately, and retry with fresh preconditions. Never blindly retry or overwrite.
+Append, restore, and external-ID upsert require `expectedCurrentRevision`. Metadata `PATCH` and upsert also require `expectedArtifactVersion`; the CLI sends the observed artifact version for append and restore as well. Use both as zero only when external-ID lookup returned 404 and the upsert will create. Stale content returns `revision_conflict`; stale metadata or visibility returns `artifact_version_conflict`. The CLI exits `3`: re-read repository and artifact state, compare changes, reconcile deliberately, and retry with fresh preconditions. Never blindly retry or overwrite.
+
+If the artifact is already public, an HTML upsert, revision append, or restore also requires `html_artifacts:share`, `confirmPublicWrite: true`, and the latest `expectedArtifactVersion`. The CLI reads visibility and version, requires `--confirm-public-sharing`, and sends the acknowledgement and version with the write. The backend enforces scope, acknowledgement, version, and revision preconditions atomically so a write-only key, an unconfirmed client, or a visibility race cannot replace live public content. Older clients can still write private artifacts but fail closed on public replacements.
 
 ## Deletion
 
@@ -57,9 +60,19 @@ Managed asset deletion removes the live record. Storage bytes remain while a pin
 
 The CLI requires `--confirm-delete` for both destructive commands.
 
-## Capability shares
+## Stable public visibility
 
-Share routes require `html_artifacts:share` and are registered only when `shareManagementEnabled` or `HTML_ARTIFACT_PUBLIC_SHARING_ENABLED=true`. A disabled route returns generic `404 not_found`; the CLI reports contextual `share_management_unavailable` and exit code `2`.
+Artifacts normalize to `private` or `public`, default to private, and are never implicitly published by create/upsert. `visibility get` uses `html_artifacts:read` and returns `artifactId`, visibility, stable `publicUrl`, version, and update time. The URL is returned while private but does not resolve publicly.
+
+`visibility set` reads the current version, then sends `visibility` and `expectedArtifactVersion`. Publishing requires `--confirm-public-sharing`; stale state returns `artifact_version_conflict` and exit code `3`. The stable `/p/{artifactId}` URL follows the current revision while public. Setting private is immediate and does not revoke pinned capability links.
+
+Publishing requires a current revision and at most 100 referenced managed images.
+
+Stable public HTML and current-revision managed images use defensive sanitization, proxying, strict CSP, noindex, no-store, and no wildcard CORS. Missing, malformed, private, deleted, unavailable, foreign, unsupported, or unreferenced resources return the same generic 404.
+
+## Pinned capability shares
+
+Pinned-share routes require `html_artifacts:share` and sharing support. An unavailable route returns generic `404 not_found`; the CLI reports contextual `share_management_unavailable` and exit code `2`.
 
 Sharing is opt-in and never part of artifact creation/upsert. `shares create` requires `--confirm-public-sharing`. Omit `--revision` to pin the current immutable revision, or choose a positive revision. Choose no expiration, a future Unix millisecond `--expires-at-ms`, or a relative `--expires-in-hours`. `shares revoke` requires `--confirm-revoke`; rotate requires `--confirm-public-sharing`.
 
@@ -73,7 +86,7 @@ Asset upload accepts a binary PNG/JPEG/WebP/GIF body with matching magic bytes, 
 
 Canonical source supports static HTML, inline CSS, safe credential-free HTTPS links, and managed images. Limits: 250 KiB source, 100 revisions/artifact, 120 requests/minute/key, and 30 writes/minute/key.
 
-Success envelope: `{"data": {...}, "requestId": "..."}`. Error envelope: `{"error":{"code":"...","message":"...","details":...},"requestId":"..."}`. Responses use `Cache-Control: no-store`.
+Artifact and revision responses include authenticated dedicated-viewer `url` values under `/agents/{agentId}/artifacts/{artifactId}`; revision URLs add `?revision={revision}`. Page responses keep their workspace URLs. Artifact responses also include normalized `visibility` and stable `publicUrl`. Success envelope: `{"data": {...}, "requestId": "..."}`. Error envelope: `{"error":{"code":"...","message":"...","details":...},"requestId":"..."}`. Responses use `Cache-Control: no-store`.
 
 CLI exit codes:
 

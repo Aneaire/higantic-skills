@@ -46,7 +46,19 @@
     {
       "id": 8,
       "prompt": "Create a public capability link for this report; the server says the sharing route is missing.",
-      "expected_output": "The share command fails clearly with exit code 2 and contextual feature-flag guidance when share management is disabled; it does not treat this as a revision conflict or silently fall back to another publication mechanism.",
+      "expected_output": "The share command fails clearly with exit code 2 and contextual sharing-availability guidance; it does not treat this as a revision conflict or silently fall back to another publication mechanism.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Publish the finalized HiGantic release report at its stable public URL so future revisions appear there too.",
+      "expected_output": "After checking for sensitive content and confirming explicit public intent, the agent reads visibility/version and publishes with visibility set public plus the confirmation flag. It returns the stable public URL, explains that it follows the current revision, and does not create a pinned capability link.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Make the release report private again, but keep the contractor's pinned revision link working until it expires.",
+      "expected_output": "The agent sets stable visibility to private immediately using the current artifact version, without revoking or rotating any pinned links, and clearly distinguishes the now-unavailable stable URL from the independently active immutable capability link.",
       "files": []
     }
   ]

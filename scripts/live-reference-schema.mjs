@@ -9,6 +9,7 @@ export const CAPABILITY_IDS = Object.freeze([
   "html-revisions",
   "managed-assets",
   "private-artifact-urls",
+  "stable-public-visibility",
   "capability-shares",
 ]);
 export const COMMAND_IDS = Object.freeze([
@@ -28,6 +29,8 @@ export const COMMAND_IDS = Object.freeze([
   "revisions.get",
   "revisions.append",
   "revisions.restore",
+  "visibility.get",
+  "visibility.set",
   "shares.list",
   "shares.create",
   "shares.revoke",
@@ -46,6 +49,7 @@ export const FEATURE_KEYS = Object.freeze([
   "staticHtmlOnly",
   "optimisticConcurrencyRequired",
   "managedAssetReferencesRequired",
+  "stablePublicVisibilitySupported",
   "capabilitySharingSupported",
   "capabilityUrlRecoverable",
   "htmlPageDeletionSupported",

@@ -39,7 +39,8 @@ CAPABILITY_TEXT = {
     "html-revisions": "List, read, append, and restore immutable artifact revisions.",
     "managed-assets": "List, upload, and deliberately delete managed image assets.",
     "private-artifact-urls": "Produce private workspace URLs for artifacts and revisions.",
-    "capability-shares": "List, create, revoke, and rotate explicit capability shares when server support is enabled.",
+    "stable-public-visibility": "Read and explicitly change stable public visibility for current-revision artifact URLs.",
+    "capability-shares": "List, create, revoke, and rotate explicit pinned capability shares when server support is enabled.",
 }
 COMMAND_TEXT = {
     "pages.list": "pages list",
@@ -58,6 +59,8 @@ COMMAND_TEXT = {
     "revisions.get": "revisions get",
     "revisions.append": "revisions append",
     "revisions.restore": "revisions restore",
+    "visibility.get": "visibility get",
+    "visibility.set": "visibility set",
     "shares.list": "shares list",
     "shares.create": "shares create",
     "shares.revoke": "shares revoke",
@@ -67,7 +70,7 @@ COMMAND_TEXT = {
 SCOPE_TEXT = {
     "html_artifacts:read": "read artifacts and revisions",
     "html_artifacts:write": "create and modify artifacts and revisions",
-    "html_artifacts:share": "perform explicit capability-sharing operations",
+    "html_artifacts:share": "publish stable URLs and manage pinned capability links",
     "html_assets:read": "list managed assets",
     "html_assets:write": "upload and delete managed assets",
     "html_pages:create": "create HTML Artifact pages",
@@ -76,7 +79,8 @@ FEATURE_TEXT = {
     "staticHtmlOnly": "Artifact content is static HTML only",
     "optimisticConcurrencyRequired": "Writes require optimistic concurrency checks",
     "managedAssetReferencesRequired": "Images use managed asset references rather than remote imports",
-    "capabilitySharingSupported": "Capability-sharing commands are supported when the server feature is enabled",
+    "stablePublicVisibilitySupported": "Stable current-revision public visibility is supported when sharing is enabled",
+    "capabilitySharingSupported": "Pinned capability-sharing commands are supported when sharing is enabled",
     "capabilityUrlRecoverable": "A capability URL can be recovered after its create or rotate response",
     "htmlPageDeletionSupported": "Direct HTML page deletion is supported",
     "remoteAssetImportSupported": "Remote image import is supported",

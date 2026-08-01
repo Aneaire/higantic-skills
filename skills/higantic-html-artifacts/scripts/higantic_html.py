@@ -318,7 +318,7 @@ def share_unavailable(error: ApiError) -> ApiError:
     return ApiError(
         error.status,
         "share_management_unavailable",
-        "Share management is unavailable or the requested artifact/share was not found. Confirm the server enables HTML_ARTIFACT_PUBLIC_SHARING_ENABLED (or shareManagementEnabled) and that the IDs are correct.",
+        "Public sharing is unavailable or the requested artifact/share was not found. Confirm sharing is enabled for the server and that the IDs are correct.",
     )
 
 
@@ -345,7 +345,7 @@ def add_artifact_identity_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage private HiGantic HTML artifacts without invoking an LLM.")
+    parser = argparse.ArgumentParser(description="Manage private-by-default HiGantic HTML artifacts without invoking an LLM.")
     groups = parser.add_subparsers(dest="group", required=True)
 
     pages = groups.add_parser("pages")
@@ -375,6 +375,7 @@ def build_parser() -> argparse.ArgumentParser:
     upsert_artifact.add_argument("--title", required=True)
     upsert_artifact.add_argument("--summary")
     upsert_artifact.add_argument("--html-file")
+    upsert_artifact.add_argument("--confirm-public-sharing", action="store_true", help="Confirm replacing the live content of an already-public artifact.")
     for command in ("get", "update", "delete"):
         item = artifact_commands.add_parser(command)
         add_artifact_identity_arguments(item)
@@ -393,6 +394,8 @@ def build_parser() -> argparse.ArgumentParser:
             item.add_argument("--revision", required=True, type=int)
         if command == "append":
             item.add_argument("--html-file", required=True)
+        if command in ("append", "restore"):
+            item.add_argument("--confirm-public-sharing", action="store_true", help="Confirm replacing the live content of an already-public artifact.")
 
     assets = groups.add_parser("assets")
     asset_commands = assets.add_subparsers(dest="command", required=True)
@@ -402,6 +405,15 @@ def build_parser() -> argparse.ArgumentParser:
     delete_asset = asset_commands.add_parser("delete")
     delete_asset.add_argument("--asset-id", required=True)
     delete_asset.add_argument("--confirm-delete", action="store_true", help="Confirm removal of the managed asset record.")
+
+    visibility = groups.add_parser("visibility", description="Read or explicitly change stable artifact visibility.")
+    visibility_commands = visibility.add_subparsers(dest="command", required=True)
+    get_visibility = visibility_commands.add_parser("get")
+    add_artifact_identity_arguments(get_visibility)
+    set_visibility = visibility_commands.add_parser("set")
+    add_artifact_identity_arguments(set_visibility)
+    set_visibility.add_argument("--visibility", required=True, choices=("private", "public"))
+    set_visibility.add_argument("--confirm-public-sharing", action="store_true", help="Acknowledge that anyone can access the stable current-revision URL while public.")
 
     shares = groups.add_parser("shares", description="Explicitly manage opt-in unlisted capability links.")
     share_commands = shares.add_subparsers(dest="command", required=True)
@@ -462,6 +474,7 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
             external_path = f"{collection}/by-external-id/{segment(args.external_id)}"
             if args.command == "lookup":
                 return client.request("GET", external_path)
+            current_artifact: Dict[str, Any] = {}
             try:
                 current_artifact = client.request("GET", external_path)["artifact"]
                 current_revision_number = int(current_artifact.get("currentRevision", 0))
@@ -471,11 +484,20 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
                     raise
                 current_revision_number = 0
                 current_version = 0
+            confirmed_public_write = args.html_file is not None and current_artifact.get("visibility") == "public"
+            if confirmed_public_write:
+                require_confirmation(
+                    args,
+                    "confirm_public_sharing",
+                    "Updating a public artifact requires --confirm-public-sharing because the new revision becomes visible immediately.",
+                )
             body = {
                 "title": args.title,
                 "expectedCurrentRevision": current_revision_number,
                 "expectedArtifactVersion": current_version,
             }
+            if confirmed_public_write:
+                body["confirmPublicWrite"] = True
             if args.summary is not None:
                 body["summary"] = args.summary
             if args.html_file is not None:
@@ -499,10 +521,44 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
             return client.request("GET", root)
         if args.command == "get":
             return client.request("GET", f"{root}/{args.revision}")
-        expected = current_revision(client, args)
+        current_artifact = client.request("GET", artifact_path(args))["artifact"]
+        expected = int(current_artifact.get("currentRevision", 0))
+        expected_version = int(current_artifact.get("version", 0))
+        confirmed_public_write = current_artifact.get("visibility") == "public"
+        if confirmed_public_write:
+            require_confirmation(
+                args,
+                "confirm_public_sharing",
+                "Updating a public artifact requires --confirm-public-sharing because the new current revision becomes visible immediately.",
+            )
+        write_body: Dict[str, Any] = {
+            "expectedCurrentRevision": expected,
+            "expectedArtifactVersion": expected_version,
+        }
+        if confirmed_public_write:
+            write_body["confirmPublicWrite"] = True
         if args.command == "append":
-            return client.request("POST", root, {"html": read_html(args.html_file), "expectedCurrentRevision": expected})
-        return client.request("POST", f"{root}/{args.revision}/restore", {"expectedCurrentRevision": expected})
+            write_body["html"] = read_html(args.html_file)
+            return client.request("POST", root, write_body)
+        return client.request("POST", f"{root}/{args.revision}/restore", write_body)
+    if args.group == "visibility":
+        path = artifact_path(args) + "/visibility"
+        try:
+            if args.command == "set" and args.visibility == "public":
+                require_confirmation(
+                    args,
+                    "confirm_public_sharing",
+                    "Publishing requires --confirm-public-sharing. Anyone can access the stable URL while the artifact is public, and it follows the current revision.",
+                )
+            current = client.request("GET", path)
+            if args.command == "get":
+                return current
+            return client.request("PUT", path, {
+                "visibility": args.visibility,
+                "expectedArtifactVersion": int(current.get("version", 0)),
+            })
+        except ApiError as error:
+            raise share_unavailable(error) from None
     if args.group == "shares":
         try:
             if args.command == "list":
@@ -533,19 +589,24 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
             return client.request("POST", share_path(args) + "/rotate")
         except ApiError as error:
             raise share_unavailable(error) from None
+    if args.artifact_id:
+        path = f"/{segment(args.page_id)}/artifacts/{segment(args.artifact_id)}"
+        if args.revision is not None:
+            result = client.request("GET", f"{path}/revisions/{args.revision}")
+            url = result.get("url")
+        else:
+            result = client.request("GET", path)
+            url = result.get("artifact", {}).get("url")
+        if not url:
+            raise ApiError(0, "not_found", "HTML artifact URL was not found.")
+        return str(url)
+    if args.revision is not None:
+        raise ApiError(0, "invalid_arguments", "--revision requires --artifact-id.")
     pages = client.request("GET").get("pages", [])
     page = next((item for item in pages if item.get("id") == args.page_id), None)
     if not page or not page.get("url"):
         raise ApiError(0, "not_found", "HTML page was not found.")
-    query = []
-    if args.artifact_id:
-        query.append(("artifact", args.artifact_id))
-    if args.revision is not None:
-        if not args.artifact_id:
-            raise ApiError(0, "invalid_arguments", "--revision requires --artifact-id.")
-        query.append(("revision", str(args.revision)))
-    suffix = "?" + urllib.parse.urlencode(query) if query else ""
-    return str(page["url"]).split("?", 1)[0] + suffix
+    return str(page["url"])
 
 
 def main() -> int:
@@ -557,6 +618,8 @@ def main() -> int:
         print(printable if args.group == "url" else json.dumps(printable, indent=2, sort_keys=True))
         if allow_capability_url:
             print("Warning: this capability link is unlisted but accessible to anyone with the link. It is shown only once; store it securely.", file=sys.stderr)
+        if args.group == "visibility" and args.command == "set" and args.visibility == "public":
+            print("Warning: the stable public URL is accessible to anyone and follows the artifact's current revision until visibility is set to private.", file=sys.stderr)
         return 0
     except ApiError as error:
         conflict_codes = {"revision_conflict", "artifact_version_conflict"}

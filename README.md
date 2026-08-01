@@ -97,7 +97,7 @@ Grant only the scopes required for the intended operation:
 - `html_pages:create` only when the agent must create a page.
 - `html_artifacts:share` only for deliberate public capability-link operations.
 
-Public sharing is never automatic. It requires explicit user intent, the non-default sharing scope, server-side support, and a confirmation flag. Capability links are unlisted rather than access-controlled, so sanitize an artifact before sharing it.
+Public sharing is never automatic. It requires explicit user intent, the non-default sharing scope, server-side support, and a confirmation flag. Replacing already-public content additionally binds that acknowledgement to the observed artifact version in the same backend transaction. Capability links are unlisted rather than access-controlled, so sanitize an artifact before sharing it.
 
 ## Updates
 

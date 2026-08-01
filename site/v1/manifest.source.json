@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-26T00:00:00Z",
+  "updatedAt": "2026-07-31T00:00:00Z",
   "references": [
     {
       "slug": "higantic-html-artifacts",
       "path": "references/higantic-html-artifacts.json",
-      "minimumInstalledVersion": "1.1.0"
+      "minimumInstalledVersion": "1.2.0"
     }
   ]
 }

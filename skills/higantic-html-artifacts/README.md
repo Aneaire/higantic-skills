@@ -37,7 +37,7 @@ Generate a key in HiGantic agent settings with only the needed scopes:
 - `html_artifacts:read` and `html_artifacts:write`
 - `html_assets:read` and `html_assets:write`
 - `html_pages:create` when page creation is required
-- `html_artifacts:share` only when the user deliberately needs public capability links
+- `html_artifacts:share` only when the user deliberately needs stable publication or pinned capability links
 
 The secret is shown once and only its hash is stored. Do not place it in a repository, prompt, CLI argument, shell history, command transcript, or committed env file. The CLI intentionally has no API-key argument.
 
@@ -63,11 +63,14 @@ python3 scripts/higantic_html.py artifacts delete --page-id PAGE_ID --artifact-i
 
 Use `higantic-asset://<assetId>` as an HTML `<img src>`; never copy temporary storage URLs into artifacts. Artifact deletion cascades through revisions and shares. Asset deletion removes the live record while bytes referenced by a pinned share snapshot may remain until no references exist.
 
-## Opt-in capability sharing
+## Opt-in public visibility and pinned links
 
-Shares are never created by default. They require explicit commands, the non-default `html_artifacts:share` scope, server-side sharing enabled, and confirmation flags.
+Artifacts remain private on create/upsert. Stable publication and pinned links require explicit commands, the non-default `html_artifacts:share` scope for writes, server-side sharing support, and confirmation before granting new public access. Publishing also requires a current revision and at most 100 managed images. Once public, HTML upsert, append, and restore require `--confirm-public-sharing`, the share scope, and the latest artifact version because they replace live content immediately; the backend checks these atomically.
 
 ```bash
+python3 scripts/higantic_html.py visibility get --page-id PAGE_ID --artifact-id ARTIFACT_ID
+python3 scripts/higantic_html.py visibility set --page-id PAGE_ID --artifact-id ARTIFACT_ID --visibility public --confirm-public-sharing
+python3 scripts/higantic_html.py visibility set --page-id PAGE_ID --artifact-id ARTIFACT_ID --visibility private
 python3 scripts/higantic_html.py shares list --page-id PAGE_ID --artifact-id ARTIFACT_ID
 python3 scripts/higantic_html.py shares create --page-id PAGE_ID --artifact-id ARTIFACT_ID --revision 2 --expires-in-hours 24 --confirm-public-sharing
 python3 scripts/higantic_html.py shares create --page-id PAGE_ID --artifact-id ARTIFACT_ID --expires-at-ms 1893456000000 --confirm-public-sharing
@@ -75,4 +78,4 @@ python3 scripts/higantic_html.py shares revoke --page-id PAGE_ID --artifact-id A
 python3 scripts/higantic_html.py shares rotate --page-id PAGE_ID --artifact-id ARTIFACT_ID --share-id SHARE_ID --confirm-public-sharing
 ```
 
-Omit `--revision` to pin the current revision. Omit both expiration options for no expiration. Capability links are unlisted but accessible to anyone with the link. The complete URL is shown only on create/rotate and cannot be recovered later. List/revoke output never exposes it. If sharing is disabled on the server, commands fail with `share_management_unavailable` and exit code `2`.
+The stable `/p/{artifactId}` URL follows the current revision while public and stops resolving immediately when made private. Making it private does not revoke pinned links. Omit `--revision` on `shares create` to pin the current revision, and omit both expiration options for no expiration. Pinned capability links are unlisted but accessible to anyone with the link; the complete URL is shown only on create/rotate and cannot be recovered later. If sharing is unavailable, affected commands fail with `share_management_unavailable` and exit code `2`.

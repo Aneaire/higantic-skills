@@ -239,6 +239,25 @@ class CliTests(unittest.TestCase):
         self.assertIn("/by-external-id/campaign%3A42", Handler.requests[1]["path"])
         self.assertEqual(Handler.requests[1]["body"]["expectedCurrentRevision"], 4)
         self.assertEqual(Handler.requests[1]["body"]["expectedArtifactVersion"], 7)
+        self.assertNotIn("confirmPublicWrite", Handler.requests[1]["body"])
+
+    def test_public_external_id_upsert_binds_confirmation_to_observed_version(self):
+        Handler.queued_responses = [
+            (200, {"data": {"artifact": {"id": "artifact-a", "currentRevision": 4, "version": 12, "visibility": "public"}}}),
+            (200, {"data": {"artifact": {"id": "artifact-a", "currentRevision": 5, "version": 13}, "created": False}}),
+        ]
+        result = self.run_cli(
+            "artifacts", "upsert",
+            "--page-id", "page-a",
+            "--external-id", "campaign:42",
+            "--title", "Updated campaign",
+            "--html-file", "-",
+            "--confirm-public-sharing",
+            input_text="<p>Updated live content</p>",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(Handler.requests[1]["body"]["expectedArtifactVersion"], 12)
+        self.assertIs(Handler.requests[1]["body"]["confirmPublicWrite"], True)
 
     def test_metadata_update_reads_then_sends_artifact_version(self):
         Handler.queued_responses = [
@@ -257,13 +276,45 @@ class CliTests(unittest.TestCase):
 
     def test_append_reads_current_revision_and_sends_precondition(self):
         Handler.queued_responses = [
-            (200, {"data": {"artifact": {"currentRevision": 4}}}),
+            (200, {"data": {"artifact": {"currentRevision": 4, "version": 7}}}),
             (201, {"data": {"revision": {"revision": 5}, "url": "https://higantic.com/private"}}),
         ]
         result = self.run_cli("revisions", "append", "--page-id", "page-a", "--artifact-id", "artifact-a", "--html-file", "-", input_text="<!doctype html><html><body>Report</body></html>")
         self.assertEqual(result.returncode, 0)
         self.assertEqual([item["method"] for item in Handler.requests], ["GET", "POST"])
         self.assertEqual(Handler.requests[1]["body"]["expectedCurrentRevision"], 4)
+        self.assertEqual(Handler.requests[1]["body"]["expectedArtifactVersion"], 7)
+        self.assertNotIn("confirmPublicWrite", Handler.requests[1]["body"])
+
+    def test_public_revision_update_requires_fresh_sharing_confirmation(self):
+        Handler.queued_responses = [
+            (200, {"data": {"artifact": {"currentRevision": 4, "version": 9, "visibility": "public"}}}),
+        ]
+        blocked = self.run_cli(
+            "revisions", "append", "--page-id", "page-a", "--artifact-id", "artifact-a",
+            "--html-file", "-", input_text="<p>Live update</p>",
+        )
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("confirm-public-sharing", blocked.stderr)
+        self.assertEqual([item["method"] for item in Handler.requests], ["GET"])
+
+        Handler.requests = []
+        Handler.queued_responses = [
+            (200, {"data": {"artifact": {"currentRevision": 4, "version": 9, "visibility": "public"}}}),
+            (201, {"data": {"revision": {"revision": 5}, "url": "https://higantic.com/private"}}),
+        ]
+        allowed = self.run_cli(
+            "revisions", "append", "--page-id", "page-a", "--artifact-id", "artifact-a",
+            "--html-file", "-", "--confirm-public-sharing", input_text="<p>Live update</p>",
+        )
+        self.assertEqual(allowed.returncode, 0)
+        self.assertEqual([item["method"] for item in Handler.requests], ["GET", "POST"])
+        self.assertEqual(Handler.requests[1]["body"], {
+            "html": "<p>Live update</p>",
+            "expectedCurrentRevision": 4,
+            "expectedArtifactVersion": 9,
+            "confirmPublicWrite": True,
+        })
 
     def test_conflict_stops_without_leaking_key(self):
         Handler.queued_responses = [
@@ -290,11 +341,12 @@ class CliTests(unittest.TestCase):
         self.assertIn("reconcile", result.stderr)
         self.assertNotIn(SECRET, result.stdout + result.stderr)
 
-    def test_url_uses_private_page_url_returned_by_api(self):
-        Handler.queued_responses = [(200, {"data": {"pages": [{"id": "page-a", "url": "https://app.example/agents/agent-a/tab/page-a"}]}})]
+    def test_url_uses_dedicated_artifact_url_returned_by_api(self):
+        Handler.queued_responses = [(200, {"data": {"revision": {"revision": 3}, "url": "https://app.example/agents/agent-a/artifacts/artifact-a?revision=3"}})]
         result = self.run_cli("url", "--page-id", "page-a", "--artifact-id", "artifact-a", "--revision", "3")
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "https://app.example/agents/agent-a/tab/page-a?artifact=artifact-a&revision=3")
+        self.assertEqual(result.stdout.strip(), "https://app.example/agents/agent-a/artifacts/artifact-a?revision=3")
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-pages/page-a/artifacts/artifact-a/revisions/3")
 
     def test_assets_list_uses_scoped_asset_route_without_printing_key(self):
         Handler.queued_responses = [(200, {"data": {"assets": []}, "requestId": "r-assets"})]
@@ -362,6 +414,89 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("invalid_path_segment", result.stderr)
                 self.assertEqual(Handler.requests, [])
+
+    def test_visibility_get_returns_normalized_state_and_stable_public_url(self):
+        Handler.queued_responses = [(200, {"data": {
+            "artifactId": "artifact-a",
+            "visibility": "private",
+            "publicUrl": "https://agent.higantic.com/p/artifact-a",
+            "version": 4,
+            "updatedAt": 100,
+        }})]
+        result = self.run_cli(
+            "visibility", "get", "--page-id", "page-a", "--artifact-id", "artifact-a",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('"visibility": "private"', result.stdout)
+        self.assertIn("https://agent.higantic.com/p/artifact-a", result.stdout)
+        self.assertEqual(Handler.requests[0]["method"], "GET")
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-pages/page-a/artifacts/artifact-a/visibility")
+
+    def test_visibility_publish_requires_confirmation_then_uses_returned_version(self):
+        unconfirmed = self.run_cli(
+            "visibility", "set",
+            "--page-id", "page-a",
+            "--artifact-id", "artifact-a",
+            "--visibility", "public",
+        )
+        self.assertEqual(unconfirmed.returncode, 2)
+        self.assertIn("confirm-public-sharing", unconfirmed.stderr)
+        self.assertEqual(Handler.requests, [])
+
+        Handler.queued_responses = [
+            (200, {"data": {"artifactId": "artifact-a", "visibility": "private", "version": 7, "updatedAt": 100, "publicUrl": "https://agent.higantic.com/p/artifact-a"}}),
+            (200, {"data": {"artifactId": "artifact-a", "visibility": "public", "version": 8, "updatedAt": 101, "publicUrl": "https://agent.higantic.com/p/artifact-a"}}),
+        ]
+        published = self.run_cli(
+            "visibility", "set",
+            "--page-id", "page-a",
+            "--artifact-id", "artifact-a",
+            "--visibility", "public",
+            "--confirm-public-sharing",
+        )
+        self.assertEqual(published.returncode, 0)
+        self.assertIn('"visibility": "public"', published.stdout)
+        self.assertIn("follows the artifact's current revision", published.stderr)
+        self.assertEqual([item["method"] for item in Handler.requests], ["GET", "PUT"])
+        self.assertEqual(Handler.requests[1]["body"], {"visibility": "public", "expectedArtifactVersion": 7})
+
+    def test_visibility_unpublish_is_immediate_without_confirmation(self):
+        Handler.queued_responses = [
+            (200, {"data": {"artifactId": "artifact-a", "visibility": "public", "version": 8, "updatedAt": 101, "publicUrl": "https://agent.higantic.com/p/artifact-a"}}),
+            (200, {"data": {"artifactId": "artifact-a", "visibility": "private", "version": 9, "updatedAt": 102, "publicUrl": "https://agent.higantic.com/p/artifact-a"}}),
+        ]
+        result = self.run_cli(
+            "visibility", "set",
+            "--page-id", "page-a",
+            "--artifact-id", "artifact-a",
+            "--visibility", "private",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(Handler.requests[1]["body"], {"visibility": "private", "expectedArtifactVersion": 8})
+        self.assertNotIn("stable public URL is accessible", result.stderr)
+
+    def test_visibility_conflict_uses_exit_code_three(self):
+        Handler.queued_responses = [
+            (200, {"data": {"artifactId": "artifact-a", "visibility": "public", "version": 4, "updatedAt": 100, "publicUrl": "https://agent.higantic.com/p/artifact-a"}}),
+            (409, {"error": {"code": "artifact_version_conflict", "message": "Visibility changed", "details": {"actualArtifactVersion": 5}}}),
+        ]
+        result = self.run_cli(
+            "visibility", "set",
+            "--page-id", "page-a",
+            "--artifact-id", "artifact-a",
+            "--visibility", "private",
+        )
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("reconcile", result.stderr)
+        self.assertNotIn(SECRET, result.stdout + result.stderr)
+
+    def test_visibility_disabled_feature_has_contextual_error(self):
+        Handler.queued_responses = [(404, {"error": {"code": "not_found", "message": "Not found"}})]
+        result = self.run_cli(
+            "visibility", "get", "--page-id", "page-a", "--artifact-id", "artifact-a",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Public sharing is unavailable", result.stderr)
 
     def test_share_lifecycle_is_explicit_and_only_create_rotate_show_capability(self):
         unconfirmed = self.run_cli(
@@ -436,7 +571,7 @@ class CliTests(unittest.TestCase):
         }})]
         result = self.run_cli("shares", "list", "--page-id", "page-a", "--artifact-id", "artifact-a")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("HTML_ARTIFACT_PUBLIC_SHARING_ENABLED", result.stderr)
+        self.assertIn("Public sharing is unavailable", result.stderr)
         self.assertNotIn("raw-error-token", result.stdout + result.stderr)
         self.assertNotIn("raw-detail-token", result.stdout + result.stderr)
         self.assertNotIn(raw_share_token, result.stdout + result.stderr)
@@ -490,21 +625,22 @@ class OfflineCommandTests(unittest.TestCase):
             def request(self, method, path="", body=None):
                 self.calls.append((method, path, body))
                 if method == "GET":
-                    return {"artifact": {"currentRevision": 7}}
+                    return {"artifact": {"currentRevision": 7, "version": 11}}
                 return {"revision": {"revision": 8}}
 
         client = FakeClient()
         args = MODULE.build_parser().parse_args(["revisions", "restore", "--page-id", "page-a", "--artifact-id", "artifact-a", "--revision", "2"])
         MODULE.execute(client, args)
         self.assertEqual(client.calls[1][2]["expectedCurrentRevision"], 7)
+        self.assertEqual(client.calls[1][2]["expectedArtifactVersion"], 11)
 
-    def test_url_comes_from_private_api_page_url(self):
+    def test_url_comes_from_dedicated_artifact_api_url(self):
         class FakeClient:
             def request(self, method, path="", body=None):
-                return {"pages": [{"id": "page-a", "url": "https://private.example/agents/a/tab/page-a"}]}
+                return {"artifact": {"url": "https://private.example/agents/a/artifacts/artifact-a"}}
 
         args = MODULE.build_parser().parse_args(["url", "--page-id", "page-a", "--artifact-id", "artifact-a"])
-        self.assertEqual(MODULE.execute(FakeClient(), args), "https://private.example/agents/a/tab/page-a?artifact=artifact-a")
+        self.assertEqual(MODULE.execute(FakeClient(), args), "https://private.example/agents/a/artifacts/artifact-a")
 
 
 if __name__ == "__main__":
