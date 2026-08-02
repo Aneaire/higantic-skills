@@ -85,6 +85,16 @@ The literal command is `higantic auth login` when that directory is on `PATH`; n
 - Windows Credential Manager.
 - Linux Secret Service through a validated `secret-tool` executable, with the key passed on stdin.
 
+After a successful login in an interactive terminal, the CLI offers to review any missing public HiGantic skills. Entering the catalog is optional, and every missing skill receives its own yes/no prompt before the CLI runs the fixed global skills.sh installer command. Already-installed skills are skipped. Login never fails merely because an optional installation is declined or fails, and redirected/noninteractive login never prompts. Use `--no-skill-offer` to suppress the post-login offer explicitly.
+
+Review the installed catalog again at any time:
+
+```bash
+higantic skills install
+```
+
+Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. The current public catalog contains `higantic-html-artifacts`, so an installation that already includes this CLI reports it as installed until more public HiGantic skills are released.
+
 Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
 
 Secure storage fails closed. Protected-file storage is never automatic and requires both flags:

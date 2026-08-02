@@ -27,6 +27,12 @@ from higantic_auth import (  # noqa: E402
     redact as redact_auth_secret,
     resolve_credentials,
 )
+from higantic_skill_install import (  # noqa: E402
+    SKILL_CATALOG,
+    SkillInstallError,
+    install_skills,
+    offer_skills_after_login,
+)
 
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -356,7 +362,7 @@ def add_artifact_identity_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage private-by-default HiGantic HTML artifacts without invoking an LLM.")
+    parser = argparse.ArgumentParser(description="Authenticate with HiGantic, install optional public skills, and manage private-by-default HTML artifacts without invoking an LLM.")
     parser.add_argument("--profile", help="Use a named HiGantic profile when no complete environment override is set.")
     parser.add_argument("--allow-protected-file", action="store_true", help="Allow an explicitly configured protected-file credential store.")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -369,6 +375,7 @@ def build_parser() -> argparse.ArgumentParser:
     login.add_argument("--scope", action="append", help="Request one explicit scope; repeat for multiple scopes.")
     login.add_argument("--no-browser", action="store_true")
     login.add_argument("--storage", choices=("native", "file"))
+    login.add_argument("--no-skill-offer", action="store_true", help="Do not offer optional HiGantic skills after successful interactive login.")
     login.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
     status = auth_commands.add_parser("status")
     status.add_argument("--profile", default=argparse.SUPPRESS)
@@ -389,6 +396,17 @@ def build_parser() -> argparse.ArgumentParser:
     imported.add_argument("--api-base-url", help="Trusted HiGantic API origin; defaults to the official service.")
     imported.add_argument("--storage", choices=("native", "file"))
     imported.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
+
+    skills = groups.add_parser("skills", description="Review and install optional public HiGantic skills.")
+    skill_commands = skills.add_subparsers(dest="command", required=True)
+    install_skills_command = skill_commands.add_parser("install")
+    install_skills_command.add_argument(
+        "--skill",
+        action="append",
+        choices=tuple(entry["slug"] for entry in SKILL_CATALOG),
+        help="Review or install only this offered skill; repeat for more than one.",
+    )
+    install_skills_command.add_argument("--yes", action="store_true", help="Install every selected missing skill without prompting.")
 
     pages = groups.add_parser("pages")
     pages_commands = pages.add_subparsers(dest="command", required=True)
@@ -654,6 +672,10 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
 def main() -> int:
     try:
         args = build_parser().parse_args()
+        if args.group == "skills":
+            result = install_skills(args.skill, args.yes)
+            print(json.dumps(safe_output(result), indent=2, sort_keys=True))
+            return 2 if result["failed"] else 0
         if args.group == "auth":
             result = execute_auth(args)
             printable = safe_output(result)
@@ -668,6 +690,13 @@ def main() -> int:
                     print(f"Scopes: {', '.join(scopes)}")
             else:
                 print(json.dumps(printable, indent=2, sort_keys=True))
+            if args.command == "login":
+                try:
+                    optional_install = offer_skills_after_login(getattr(args, "no_skill_offer", False))
+                    if optional_install and optional_install.get("failed"):
+                        print("Authentication succeeded, but one or more optional skills could not be installed.", file=sys.stderr)
+                except SkillInstallError as error:
+                    print(f"Authentication succeeded, but the optional skill catalog could not be opened: {error}", file=sys.stderr)
             return 0
         result = execute(Client(args.profile, args.allow_protected_file), args)
         allow_capability_url = args.group == "shares" and args.command in ("create", "rotate")
@@ -678,7 +707,7 @@ def main() -> int:
         if args.group == "visibility" and args.command == "set" and args.visibility == "public":
             print("Warning: the stable public URL is accessible to anyone and follows the artifact's current revision until visibility is set to private.", file=sys.stderr)
         return 0
-    except (ApiError, AuthError) as error:
+    except (ApiError, AuthError, SkillInstallError) as error:
         conflict_codes = {"revision_conflict", "artifact_version_conflict"}
         suffix = " Refresh the artifact and reconcile before retrying." if error.code in conflict_codes else ""
         details = f" Details: {json.dumps(safe_output(error.details), sort_keys=True)}" if error.details is not None else ""

@@ -186,6 +186,26 @@ def validate_skills_manifest(errors: List[str]) -> Set[str]:
     return seen
 
 
+def validate_cli_skill_catalog(errors: List[str], expected_slugs: Set[str]) -> None:
+    path = SKILLS_DIR / "higantic-html-artifacts" / "scripts" / "higantic_skill_install.py"
+    if not path.is_file():
+        errors.append(f"{path.relative_to(ROOT)}: missing CLI skill catalog")
+        return
+    try:
+        spec = importlib.util.spec_from_file_location("higantic_skill_install_validation", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("could not create import specification")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        entries = module._catalog()
+    except Exception as error:
+        errors.append(f"{path.relative_to(ROOT)}: invalid CLI skill catalog: {error}")
+        return
+    catalog_slugs = {entry.get("slug") for entry in entries if isinstance(entry, dict)}
+    if len(catalog_slugs) != len(entries) or catalog_slugs != expected_slugs:
+        errors.append("CLI skill catalog must exactly match skills.sh.json")
+
+
 def validate_source_manifest(errors: List[str]) -> Tuple[Set[str], Dict[str, Dict[str, Any]], Optional[Dict[str, Any]]]:
     raw = validate_bounded_file(SOURCE_MANIFEST, MAX_MANIFEST_BYTES, errors, "site/v1/manifest.source.json")
     if raw is None:
@@ -522,6 +542,7 @@ def main() -> int:
     errors: List[str] = []
     directory_slugs = validate_skills(errors)
     skills_manifest_slugs = validate_skills_manifest(errors)
+    validate_cli_skill_catalog(errors, skills_manifest_slugs)
     live_slugs, source_entries, source_manifest = validate_source_manifest(errors)
     if directory_slugs != skills_manifest_slugs:
         errors.append("skills.sh.json skill set must exactly match skills/ directories")
