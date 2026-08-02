@@ -20,7 +20,8 @@ from higantic_secure_store import SecureStoreError, atomic_write, config_path, o
 
 OFFICIAL_API_ORIGIN = "https://agent.higantic.com"
 OFFICIAL_VERIFICATION_URI = "https://www.higantic.com/auth/device"
-CLI_USER_AGENT = "higantic-cli/1.5.1"
+CLI_VERSION = "1.5.2"
+CLI_USER_AGENT = f"higantic-cli/{CLI_VERSION}"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 DEFAULT_SCOPES = [
     "html_artifacts:read",
@@ -320,7 +321,12 @@ def _prepare_profile(args, config: Dict[str, Any]) -> Tuple[str, Optional[Dict[s
     name = _profile_name(getattr(args, "profile", None), config, creating=True)
     existing = config["profiles"].get(name)
     if existing is not None:
-        raise AuthError(0, "profile_exists", f"Profile {name!r} already exists; revoke it with auth logout before signing in again.")
+        raise AuthError(
+            0,
+            "profile_exists",
+            f"Profile {name!r} is already configured.",
+            {"profile": name},
+        )
     existing_record = None
     candidate_base = getattr(args, "api_base_url", None) or OFFICIAL_API_ORIGIN
     base_url = validate_api_base_url(str(candidate_base))
@@ -410,7 +416,9 @@ def auth_login(args) -> Dict[str, Any]:
         except Exception:
             pass
     interval = max(1, int(started.get("interval", 5)))
-    expires_at = time.monotonic() + max(1, int(started.get("expires_in", 600)))
+    expires_in = max(1, int(started.get("expires_in", 600)))
+    expires_at = time.monotonic() + expires_in
+    print(f"Waiting for browser approval (expires in {expires_in} seconds)...", file=sys.stderr)
     time.sleep(interval)
     token = None
     while time.monotonic() < expires_at:
@@ -428,6 +436,7 @@ def auth_login(args) -> Dict[str, Any]:
             raise
     if token is None:
         raise AuthError(0, "expired_token", "The device authorization expired before approval.")
+    print("Approval received. Securing the credential...", file=sys.stderr)
     secret = str(token.get("access_token", ""))
     if not SCOPED_KEY_PATTERN.fullmatch(secret):
         register_secret(secret)
@@ -541,6 +550,32 @@ def auth_use(args) -> Dict[str, Any]:
     return {"currentProfile": name}
 
 
+def auth_profiles(_args) -> Dict[str, Any]:
+    environment_active, _ = environment_state()
+    config = load_config()
+    current = config.get("currentProfile")
+    profiles = []
+    for name in sorted(config["profiles"]):
+        validate_profile_name(name)
+        record = config["profiles"][name]
+        if not isinstance(record, dict):
+            raise AuthError(0, "invalid_config", f"Profile {name!r} has an invalid format.")
+        profiles.append({
+            "name": name,
+            "current": name == current,
+            "agentId": str(record.get("agentId", "")).strip(),
+            "agentName": str(record.get("agentName", "")).strip(),
+            "apiBaseUrl": str(record.get("apiBaseUrl", "")).strip(),
+            "storage": str(record.get("storage", "native")).strip(),
+            "scopes": list(record.get("scopes", [])) if isinstance(record.get("scopes", []), list) else [],
+        })
+    return {
+        "currentProfile": current if isinstance(current, str) else None,
+        "environmentOverrideActive": environment_active,
+        "profiles": profiles,
+    }
+
+
 def auth_logout(args) -> Dict[str, Any]:
     has_environment, _ = environment_state()
     if has_environment:
@@ -584,6 +619,8 @@ def execute_auth(args) -> Dict[str, Any]:
         return auth_status(args)
     if args.command == "use":
         return auth_use(args)
+    if args.command == "profiles":
+        return auth_profiles(args)
     if args.command == "logout":
         return auth_logout(args)
     if args.command == "import":

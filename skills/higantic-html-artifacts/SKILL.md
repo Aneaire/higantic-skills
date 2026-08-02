@@ -52,9 +52,12 @@ Never publish stable visibility, change the live content of an already-public ar
 ```bash
 higantic auth login
 higantic auth status
+higantic auth profiles
 higantic auth use PROFILE
 higantic auth logout
 higantic auth import --stdin
+higantic doctor
+higantic --version
 higantic skills install
 higantic skills install --json
 python3 scripts/higantic_html.py pages list

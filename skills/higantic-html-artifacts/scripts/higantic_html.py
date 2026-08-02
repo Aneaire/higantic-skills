@@ -23,10 +23,12 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 
 from higantic_auth import (  # noqa: E402
     AuthError,
+    CLI_VERSION,
     execute_auth,
     redact as redact_auth_secret,
     resolve_credentials,
 )
+from higantic_diagnostics import run_doctor  # noqa: E402
 from higantic_skill_install import (  # noqa: E402
     SKILL_CATALOG,
     SkillInstallError,
@@ -364,6 +366,7 @@ def add_artifact_identity_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Authenticate with HiGantic, install optional public skills, and manage private-by-default HTML artifacts without invoking an LLM.")
+    parser.add_argument("--version", action="version", version=f"HiGantic CLI {CLI_VERSION}")
     parser.add_argument("--profile", help="Use a named HiGantic profile when no complete environment override is set.")
     parser.add_argument("--allow-protected-file", action="store_true", help="Allow an explicitly configured protected-file credential store.")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -377,6 +380,7 @@ def build_parser() -> argparse.ArgumentParser:
     login.add_argument("--no-browser", action="store_true")
     login.add_argument("--storage", choices=("native", "file"))
     login.add_argument("--no-skill-offer", action="store_true", help="Do not offer optional HiGantic skills after successful interactive login.")
+    login.add_argument("--json", action="store_true", help="Print the authentication result as JSON and suppress optional skill prompts.")
     login.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
     status = auth_commands.add_parser("status")
     status.add_argument("--profile", default=argparse.SUPPRESS)
@@ -385,18 +389,29 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
     use = auth_commands.add_parser("use")
     use.add_argument("name")
+    use.add_argument("--json", action="store_true")
     use.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
     logout = auth_commands.add_parser("logout")
     logout.add_argument("--profile", default=argparse.SUPPRESS)
     logout.add_argument("--yes", action="store_true")
     logout.add_argument("--local-only", action="store_true")
+    logout.add_argument("--json", action="store_true")
     logout.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
     imported = auth_commands.add_parser("import")
     imported.add_argument("--profile", default=argparse.SUPPRESS)
     imported.add_argument("--stdin", action="store_true", required=True)
     imported.add_argument("--api-base-url", help="Trusted HiGantic API origin; defaults to the official service.")
     imported.add_argument("--storage", choices=("native", "file"))
+    imported.add_argument("--json", action="store_true")
     imported.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
+    profiles = auth_commands.add_parser("profiles", description="List configured profile metadata without reading or printing API keys.")
+    profiles.add_argument("--json", action="store_true")
+
+    doctor = groups.add_parser("doctor", description="Run read-only CLI, credential, dependency, and API diagnostics.")
+    doctor.add_argument("--profile", default=argparse.SUPPRESS)
+    doctor.add_argument("--offline", action="store_true", help="Skip the authenticated API connectivity check.")
+    doctor.add_argument("--json", action="store_true")
+    doctor.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
 
     skills = groups.add_parser("skills", description="Review and install optional public HiGantic skills.")
     skill_commands = skills.add_subparsers(dest="command", required=True)
@@ -671,9 +686,110 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
     return str(page["url"])
 
 
+def terminal_line(value: Any) -> str:
+    cleaned = "".join(character if not unicodedata.category(character).startswith("C") else " " for character in redact(value))
+    return " ".join(cleaned.split())
+
+
+def _agent_label(result: Dict[str, Any]) -> str:
+    name = terminal_line(result.get("agentName") or "")
+    agent_id = terminal_line(result.get("agentId") or "")
+    if name and agent_id and name != agent_id:
+        return f"{name} ({agent_id})"
+    return name or agent_id or "Unknown agent"
+
+
+def format_auth_result(command: str, result: Dict[str, Any]) -> str:
+    if command in {"login", "import"}:
+        profile = terminal_line(result.get("profile") or "default")
+        action = "Signed in to" if command == "login" else "Imported credentials for"
+        lines = [f"{action} {_agent_label(result)} using profile {profile!r}."]
+        if result.get("apiBaseUrl"):
+            lines.append(f"API: {terminal_line(result['apiBaseUrl'])}")
+        if result.get("storage"):
+            lines.append(f"Credential storage: {terminal_line(result['storage'])}")
+        scopes = result.get("scopes") or []
+        if scopes:
+            lines.append(f"Scopes: {', '.join(terminal_line(scope) for scope in scopes)}")
+        return "\n".join(lines)
+    if command == "status":
+        source = result.get("profile") or result.get("source") or "unknown"
+        mode = "offline" if result.get("offline") else "remote"
+        lines = [
+            f"Authenticated ({mode}) using {terminal_line(source)}.",
+            f"Agent: {_agent_label(result)}",
+            f"API: {terminal_line(result.get('apiBaseUrl') or '')}",
+        ]
+        scopes = result.get("scopes") or []
+        if scopes:
+            lines.append(f"Scopes: {', '.join(terminal_line(scope) for scope in scopes)}")
+        return "\n".join(lines)
+    if command == "use":
+        return f"Profile {terminal_line(result.get('currentProfile') or '')!r} is now active."
+    if command == "logout":
+        profile = terminal_line(result.get("profile") or "")
+        if result.get("revoked"):
+            return f"Revoked the API key and removed profile {profile!r} from this device."
+        return f"Removed profile {profile!r} from this device without revoking its API key."
+    if command == "profiles":
+        profiles = result.get("profiles") or []
+        lines = []
+        if result.get("environmentOverrideActive"):
+            lines.append("Environment credentials are active and currently override named profiles.")
+        if not profiles:
+            lines.extend(["No HiGantic profiles are configured.", "Run: higantic auth login"])
+            return "\n".join(lines)
+        lines.append("Configured HiGantic profiles:")
+        for profile in profiles:
+            marker = "*" if profile.get("current") else "-"
+            name = terminal_line(profile.get("name") or "")
+            agent = _agent_label(profile)
+            current = " (active)" if profile.get("current") else ""
+            lines.append(f"  {marker} {name}: {agent}{current}")
+        return "\n".join(lines)
+    return json.dumps(result, indent=2, sort_keys=True)
+
+
+def format_doctor_result(result: Dict[str, Any]) -> str:
+    labels = {"ok": "OK", "warning": "WARN", "error": "ERROR", "skipped": "SKIP"}
+    lines = [f"HiGantic CLI {terminal_line(result.get('version') or '')} diagnostics"]
+    for check in result.get("checks", []):
+        status = labels.get(str(check.get("status")), "INFO")
+        name = terminal_line(check.get("name") or "Check")
+        message = terminal_line(check.get("message") or "")
+        lines.append(f"[{status}] {name}: {message}")
+    outcome = {"ok": "Ready", "warning": "Ready with warnings", "error": "Problems found"}.get(result.get("status"), "Complete")
+    lines.append(f"Result: {outcome}.")
+    return "\n".join(lines)
+
+
+def error_hint(code: str) -> Optional[str]:
+    hints = {
+        "profile_not_selected": "Run `higantic auth profiles`, then select one with `higantic auth use PROFILE` or sign in with `higantic auth login`.",
+        "profile_not_found": "Run `higantic auth profiles` to see configured profiles, or create one with `higantic auth login --profile NAME`.",
+        "credential_not_found": "Run `higantic doctor` to check secure storage. If the profile is broken, remove that exact profile with `higantic auth logout --profile PROFILE --local-only` and sign in again.",
+        "invalid_api_key": "Run `higantic doctor`. Sign in again if the stored or environment API key is no longer valid.",
+        "incomplete_environment": "Set all three HIGANTIC_API_BASE_URL, HIGANTIC_AGENT_ID, and HIGANTIC_API_KEY variables, or unset all three.",
+        "environment_override_active": "Unset HIGANTIC_API_BASE_URL, HIGANTIC_AGENT_ID, and HIGANTIC_API_KEY before managing named profiles.",
+        "secure_storage_unavailable": "Run `higantic doctor` for the failing credential-store dependency and suggested setup.",
+        "connection_error": "Check the network connection and run `higantic doctor` to test the configured API.",
+        "expired_token": "Run `higantic auth login` again to start a new ten-minute approval session.",
+        "authorization_denied": "Review the selected agent and permissions in the browser, then run `higantic auth login` again.",
+        "access_denied": "Review the selected agent and permissions in the browser, then run `higantic auth login` again.",
+        "interactive_required": "Run the command in a terminal, or pass `--yes` only when installing every selected missing skill is intentional.",
+        "skills_installer_unavailable": "Install Node.js with npx, then run `higantic doctor` to verify it.",
+    }
+    return hints.get(code)
+
+
 def main() -> int:
     try:
         args = build_parser().parse_args()
+        if args.group == "doctor":
+            result = run_doctor(args.profile, args.allow_protected_file, args.offline)
+            printable = safe_output(result)
+            print(json.dumps(printable, indent=2, sort_keys=True) if args.json else format_doctor_result(printable))
+            return 2 if result["status"] == "error" else 0
         if args.group == "skills":
             result = install_skills(args.skill, args.yes)
             printable = safe_output(result)
@@ -682,20 +798,10 @@ def main() -> int:
         if args.group == "auth":
             result = execute_auth(args)
             printable = safe_output(result)
-            if args.command == "status" and not args.json:
-                profile = printable.get("profile") or printable.get("source")
-                mode = "offline" if printable.get("offline") else "remote"
-                print(f"Authenticated ({mode}) via {profile}")
-                print(f"Agent: {printable.get('agentName') or printable.get('agentId')}")
-                print(f"API: {printable.get('apiBaseUrl')}")
-                scopes = printable.get("scopes") or []
-                if scopes:
-                    print(f"Scopes: {', '.join(scopes)}")
-            else:
-                print(json.dumps(printable, indent=2, sort_keys=True))
+            print(json.dumps(printable, indent=2, sort_keys=True) if args.json else format_auth_result(args.command, printable))
             if args.command == "login":
                 try:
-                    optional_install = offer_skills_after_login(getattr(args, "no_skill_offer", False))
+                    optional_install = offer_skills_after_login(getattr(args, "no_skill_offer", False) or args.json)
                     if optional_install and optional_install.get("failed"):
                         print("Authentication succeeded, but one or more optional skills could not be installed.", file=sys.stderr)
                 except SkillInstallError as error:
@@ -711,16 +817,34 @@ def main() -> int:
             print("Warning: the stable public URL is accessible to anyone and follows the artifact's current revision until visibility is set to private.", file=sys.stderr)
         return 0
     except (ApiError, AuthError, SkillInstallError) as error:
+        if isinstance(error, AuthError) and error.code == "profile_exists" and isinstance(error.details, dict):
+            profile = str(error.details.get("profile", ""))
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", profile):
+                print(
+                    f"HiGantic profile {profile!r} is already configured.\n\n"
+                    "Check the current sign-in:\n"
+                    f"  higantic auth status --profile {profile}\n\n"
+                    "To sign in again, revoke the old API key first:\n"
+                    f"  higantic auth logout --profile {profile}\n"
+                    f"  higantic auth login --profile {profile}\n\n"
+                    "Or keep this profile and create another one:\n"
+                    "  higantic auth login --profile another-name",
+                    file=sys.stderr,
+                )
+                return 2
         conflict_codes = {"revision_conflict", "artifact_version_conflict"}
         suffix = " Refresh the artifact and reconcile before retrying." if error.code in conflict_codes else ""
         details = f" Details: {json.dumps(safe_output(error.details), sort_keys=True)}" if error.details is not None else ""
-        print(redact(f"HiGantic error [{error.code}]: {error}{details}{suffix}"), file=sys.stderr)
+        print(f"HiGantic error [{terminal_line(error.code)}]: {terminal_line(error)}{details}{suffix}", file=sys.stderr)
+        hint = error_hint(error.code)
+        if hint:
+            print(f"Hint: {hint}", file=sys.stderr)
         return 3 if error.code in conflict_codes else 2
     except (OSError, ValueError) as error:
-        print(redact(f"HiGantic CLI error: {error}"), file=sys.stderr)
+        print(f"HiGantic CLI error: {terminal_line(error)}", file=sys.stderr)
         return 2
     except Exception as error:
-        print(redact(f"HiGantic CLI error: {error}"), file=sys.stderr)
+        print(f"HiGantic CLI error: {terminal_line(error)}", file=sys.stderr)
         return 2
 
 

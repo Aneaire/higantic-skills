@@ -142,13 +142,21 @@ class EnvironmentResolutionTests(unittest.TestCase):
 class ParserTests(unittest.TestCase):
     def test_auth_commands_and_global_profile_are_available_without_key_argument(self):
         parser = HTML.build_parser()
-        login = parser.parse_args(["--profile", "work", "auth", "login", "--no-browser"])
+        login = parser.parse_args(["--profile", "work", "auth", "login", "--no-browser", "--json"])
         self.assertEqual(login.profile, "work")
         self.assertTrue(login.no_browser)
+        self.assertTrue(login.json)
         imported = parser.parse_args(["auth", "import", "--profile", "work", "--stdin"])
         self.assertEqual(imported.profile, "work")
         selected = parser.parse_args(["auth", "use", "work", "--allow-protected-file"])
         self.assertTrue(selected.allow_protected_file)
+        profiles = parser.parse_args(["auth", "profiles", "--json"])
+        self.assertEqual(profiles.command, "profiles")
+        self.assertTrue(profiles.json)
+        doctor = parser.parse_args(["doctor", "--profile", "work", "--offline", "--json"])
+        self.assertEqual(doctor.group, "doctor")
+        self.assertEqual(doctor.profile, "work")
+        self.assertTrue(doctor.offline)
         with self.assertRaises(SystemExit):
             parser.parse_args(["auth", "login", "--replace"])
         with self.assertRaises(SystemExit):
@@ -227,6 +235,8 @@ class ProfileCommandTests(unittest.TestCase):
         self.assertEqual(self.store.values["work"], KEY)
         self.assertNotIn(KEY, stderr.getvalue())
         self.assertIn("ABCD-EFGH", stderr.getvalue())
+        self.assertIn("Waiting for browser approval", stderr.getvalue())
+        self.assertIn("Approval received", stderr.getvalue())
         config = json.loads(self.config_path.read_text())
         self.assertNotIn(KEY, json.dumps(config))
         self.assertEqual(config["currentProfile"], "work")
@@ -337,6 +347,7 @@ class ProfileCommandTests(unittest.TestCase):
         with self.assertRaises(AUTH.AuthError) as raised:
             AUTH._prepare_profile(self.args(replace=True), config)
         self.assertEqual(raised.exception.code, "profile_exists")
+        self.assertEqual(raised.exception.details, {"profile": "work"})
         self.assertEqual(self.store.preflight_count, 0)
 
     def test_profile_use_requires_a_retrievable_current_scoped_key(self):
@@ -355,6 +366,28 @@ class ProfileCommandTests(unittest.TestCase):
         result = AUTH.auth_use(self.args(name="work"))
         self.assertEqual(result["currentProfile"], "work")
         self.assertEqual(AUTH.load_config()["currentProfile"], "work")
+
+    def test_profiles_lists_metadata_without_reading_secure_storage(self):
+        config = {
+            "version": 1,
+            "currentProfile": "work",
+            "profiles": {
+                "other": {"apiBaseUrl": AUTH.OFFICIAL_API_ORIGIN, "agentId": "agent-b", "storage": "native"},
+                "work": {
+                    "apiBaseUrl": AUTH.OFFICIAL_API_ORIGIN,
+                    "agentId": "agent-a",
+                    "agentName": "Agent A",
+                    "storage": "native",
+                    "scopes": ["html_artifacts:read"],
+                },
+            },
+        }
+        AUTH.save_config(config)
+        with mock.patch.object(self.store, "get", side_effect=AssertionError("profile listing must not read secrets")):
+            result = AUTH.auth_profiles(self.args())
+        self.assertEqual([item["name"] for item in result["profiles"]], ["other", "work"])
+        self.assertTrue(result["profiles"][1]["current"])
+        self.assertNotIn(KEY, json.dumps(result))
 
     def test_remote_logout_failure_retains_profile_and_secret(self):
         config = {

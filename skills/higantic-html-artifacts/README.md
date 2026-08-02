@@ -38,11 +38,15 @@ higantic auth login
 higantic auth status
 ```
 
-`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code on stderr, and waits for explicit approval of one active agent and a reviewed scope subset. Standard artifact scopes are requested by default; the high-trust `html_artifacts:share` scope is requested only with an explicit repeated `--scope` and is never preselected in the browser.
+`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard artifact scopes are requested by default; the high-trust `html_artifacts:share` scope is requested only with an explicit repeated `--scope` and is never preselected in the browser.
 
-After successful interactive login, the CLI offers to review missing public HiGantic skills. The catalog is optional, every missing skill has a separate yes/no prompt, installed skills are skipped, and optional installation cannot turn a successful authentication into a failure. Redirected or noninteractive login never prompts; use `auth login --no-skill-offer` to suppress the offer explicitly. Run `higantic skills install` to revisit the catalog or `higantic skills install --yes` for deliberate noninteractive installation of every missing offered skill. The command prints English by default; pass `--json` when a script needs its structured result. The fixed skills.sh child process receives no HiGantic credential or custom-origin environment variables.
+After successful interactive login, the CLI offers to review missing public HiGantic skills. The catalog is optional, every missing skill has a separate yes/no prompt, installed skills are skipped, and optional installation cannot turn a successful authentication into a failure. Redirected or noninteractive login never prompts; use `auth login --no-skill-offer` to suppress the offer explicitly. Run `higantic skills install` to revisit the catalog or `higantic skills install --yes` for deliberate noninteractive installation of every missing offered skill. The command prints English by default; pass `--json` when a script needs its structured result. The fixed skills.sh child process receives no HiGantic credential or custom-origin environment variables, and failed processes expose only a bounded, control-free final reason.
 
 Issued keys are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service through a validated `secret-tool` executable. Profile metadata contains no key and is stored at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
+
+When login finds an existing profile, the CLI explains how to inspect it, revoke and replace its API key safely, or keep it and create another named profile. It never silently overwrites an existing credential.
+
+Authentication commands use concise English output by default. Pass `--json` to any auth command for scripts; JSON login suppresses the optional skill catalog. `higantic auth profiles` lists non-secret metadata and marks the active profile without reading stored keys. `higantic doctor` runs read-only configuration, credential, dependency, and authenticated API checks; `--offline` skips the network check, and `--json` returns the structured report. `higantic --version` prints the installed CLI version.
 
 Secure-storage failure is terminal. Protected-file storage is never selected automatically:
 
@@ -57,10 +61,14 @@ Profile commands:
 ```bash
 higantic auth status                 # validates remotely
 higantic auth status --offline       # reads local metadata only
+higantic auth profiles               # lists non-secret profile metadata
 higantic auth use PROFILE
 higantic auth logout                 # remote revoke, then local delete
 higantic auth logout --local-only    # explicit local-only escape hatch
 higantic auth import --stdin         # exactly one key line, remotely validated
+higantic doctor                      # read-only setup and connectivity checks
+higantic doctor --offline            # skip the remote API check
+higantic --version
 higantic skills install              # review missing public skills one by one
 higantic skills install --json       # machine-readable installation result
 ```

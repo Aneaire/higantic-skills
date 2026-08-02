@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added English-by-default auth results with explicit `--json`, non-secret `auth profiles`, read-only `doctor` diagnostics, `--version`, device-approval progress, contextual recovery hints, and bounded control-free child-installer failure details.
+- Replaced the terse existing-profile login error with actionable commands to inspect the profile, safely revoke and sign in again, or create another named profile.
 - Changed `higantic skills install` to print a concise English summary by default while preserving structured automation output through `--json`.
 - Added `higantic skills install` plus an optional post-login catalog that skips installed skills, confirms each missing skill separately, remains silent in noninteractive sessions, and strips HiGantic credential variables from the cross-platform skills.sh child process.
 - Replaced agent-consumed mutable Markdown with closed-schema structured JSON at `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`; remote bytes and arbitrary prose are never printed, and fixed installed renderer text remains subordinate to local skill safeguards.

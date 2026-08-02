@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -15,6 +16,8 @@ from typing import Any, Dict, List, Optional, Sequence
 SKILL_REPOSITORY = "Aneaire/higantic-skills"
 SKILL_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 INSTALL_TIMEOUT_SECONDS = 300
+INSTALLER_MESSAGE_LIMIT = 240
+ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 SENSITIVE_CHILD_ENVIRONMENT = {
     "HIGANTIC_AGENT_ID",
     "HIGANTIC_API_BASE_URL",
@@ -108,6 +111,29 @@ def _child_environment() -> Dict[str, str]:
     return {key: value for key, value in os.environ.items() if key not in SENSITIVE_CHILD_ENVIRONMENT}
 
 
+def installer_available() -> Dict[str, Any]:
+    try:
+        _npx_executable()
+        return {"available": True, "message": "Node.js and npx are available."}
+    except SkillInstallError as error:
+        return {"available": False, "message": str(error)}
+
+
+def _installer_failure_message(completed: subprocess.CompletedProcess) -> str:
+    output = completed.stderr or completed.stdout or ""
+    lines = []
+    for raw in output.splitlines():
+        cleaned = ANSI_ESCAPE_PATTERN.sub("", raw)
+        cleaned = "".join(character if not unicodedata.category(character).startswith("C") else " " for character in cleaned)
+        cleaned = " ".join(cleaned.split())
+        if cleaned:
+            lines.append(cleaned)
+    if not lines:
+        return "No additional details were returned."
+    message = lines[-1]
+    return message if len(message) <= INSTALLER_MESSAGE_LIMIT else message[: INSTALLER_MESSAGE_LIMIT - 1] + "…"
+
+
 def _install(entry: Dict[str, str]) -> None:
     command = [
         _npx_executable(),
@@ -136,9 +162,10 @@ def _install(entry: Dict[str, str]) -> None:
     except OSError as error:
         raise SkillInstallError("skill_install_failed", f"Could not start the skills installer: {error}") from None
     if completed.returncode != 0:
+        reason = _installer_failure_message(completed)
         raise SkillInstallError(
             "skill_install_failed",
-            f"The skills installer exited with code {completed.returncode} while installing {entry['name']}.",
+            f"The skills installer exited with code {completed.returncode} while installing {entry['name']}. {reason}",
         )
 
 
@@ -171,7 +198,7 @@ def install_skills(selected: Optional[Sequence[str]] = None, assume_yes: bool = 
             result["installed"].append(entry["slug"])
             print(f"Installed {entry['name']} globally.", file=sys.stderr)
         except SkillInstallError as error:
-            result["failed"].append({"slug": entry["slug"], "code": error.code})
+            result["failed"].append({"slug": entry["slug"], "code": error.code, "message": str(error)})
             print(f"Could not install {entry['name']}: {error}", file=sys.stderr)
     return result
 
@@ -202,8 +229,12 @@ def format_install_result(result: Dict[str, Any]) -> str:
         for item in failed:
             slug = item.get("slug", "unknown") if isinstance(item, dict) else str(item)
             code = item.get("code") if isinstance(item, dict) else None
+            message = item.get("message") if isinstance(item, dict) else None
             label = display_name(slug)
-            failures.append(f"{label} ({code})" if code else label)
+            if isinstance(message, str) and message:
+                failures.append(f"{label} — {message}")
+            else:
+                failures.append(f"{label} ({code})" if code else label)
         lines.append(f"  Failed: {', '.join(failures)}")
     if len(lines) == 1:
         lines.append("  No skills needed installation.")

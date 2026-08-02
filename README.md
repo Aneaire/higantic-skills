@@ -79,7 +79,7 @@ higantic auth login
 higantic auth status
 ```
 
-The literal command is `higantic auth login` when that directory is on `PATH`; no package publication or global Python installation is required. Login shows a ten-minute code and URL on stderr, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
+The literal command is `higantic auth login` when that directory is on `PATH`; no package publication or global Python installation is required. Login shows a ten-minute code and URL, reports that it is waiting and when the approval expires, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
 
 - macOS Keychain through the Security framework.
 - Windows Credential Manager.
@@ -93,9 +93,22 @@ Review the installed catalog again at any time:
 higantic skills install
 ```
 
-The command prints a short English summary by default. Use `higantic skills install --json` when a script needs the structured result. Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. The current public catalog contains `higantic-html-artifacts`, so an installation that already includes this CLI reports it as installed until more public HiGantic skills are released.
+The command prints a short English summary by default. Use `higantic skills install --json` when a script needs the structured result. Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. Failed child processes surface only a bounded, control-free final reason. The current public catalog contains `higantic-html-artifacts`, so an installation that already includes this CLI reports it as installed until more public HiGantic skills are released.
 
 Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
+
+If login finds an existing profile, it shows commands to check the current sign-in, safely revoke and replace its API key, or create a separately named profile. Existing credentials are never silently overwritten.
+
+Authentication commands print concise English by default. Add `--json` to `login`, `status`, `use`, `logout`, `import`, or `profiles` when a script needs structured output; JSON login also suppresses optional skill prompts. Inspect local profile metadata without reading API keys and run read-only diagnostics with:
+
+```bash
+higantic auth profiles
+higantic doctor
+higantic doctor --offline
+higantic --version
+```
+
+`doctor` checks the CLI version, environment override, protected configuration, credential availability, authenticated API connectivity, secure-storage provider when relevant, and optional `npx` dependency. It never prints a key and exits nonzero only when a check fails; missing optional setup is reported as a warning. Use `--json` for structured diagnostics.
 
 Secure storage fails closed. Protected-file storage is never automatic and requires both flags:
 

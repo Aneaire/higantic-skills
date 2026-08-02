@@ -130,8 +130,53 @@ class ProcessSafetyTests(unittest.TestCase):
         self.assertNotIn("HIGANTIC_API_BASE_URL", options["env"])
         self.assertFalse(options.get("shell", False))
 
+    def test_installer_failure_surfaces_only_a_bounded_control_free_reason(self):
+        completed = subprocess.CompletedProcess([], 1, "", "\x1b[31mfirst line\x1b[0m\npackage failed\x07\u202e\n")
+        with mock.patch.object(INSTALLER.shutil, "which", return_value="/usr/bin/npx"):
+            with mock.patch.object(INSTALLER.subprocess, "run", return_value=completed):
+                with self.assertRaises(INSTALLER.SkillInstallError) as raised:
+                    INSTALLER._install(FIXTURE_CATALOG[1])
+        message = str(raised.exception)
+        self.assertIn("package failed", message)
+        self.assertNotIn("\x1b", message)
+        self.assertNotIn("\x07", message)
+        self.assertNotIn("\u202e", message)
+
 
 class MainFlowTests(unittest.TestCase):
+    def test_existing_profile_error_explains_safe_next_steps(self):
+        stderr = io.StringIO()
+        error = HTML.AuthError(
+            0,
+            "profile_exists",
+            "Profile 'default' is already configured.",
+            {"profile": "default"},
+        )
+        with mock.patch.object(sys, "argv", ["higantic", "auth", "login"]):
+            with mock.patch.object(HTML, "execute_auth", side_effect=error):
+                with contextlib.redirect_stderr(stderr):
+                    self.assertEqual(HTML.main(), 2)
+        output = stderr.getvalue()
+        self.assertIn("profile 'default' is already configured", output)
+        self.assertIn("higantic auth status --profile default", output)
+        self.assertIn("higantic auth logout --profile default", output)
+        self.assertIn("higantic auth login --profile default", output)
+        self.assertIn("higantic auth login --profile another-name", output)
+        self.assertNotIn("HiGantic error [profile_exists]", output)
+
+    def test_generic_auth_error_has_a_safe_contextual_hint(self):
+        stderr = io.StringIO()
+        error = HTML.AuthError(0, "connection_error", "Could not\x1b[31m connect.\u202e")
+        with mock.patch.object(sys, "argv", ["higantic", "auth", "status"]):
+            with mock.patch.object(HTML, "execute_auth", side_effect=error):
+                with contextlib.redirect_stderr(stderr):
+                    self.assertEqual(HTML.main(), 2)
+        output = stderr.getvalue()
+        self.assertIn("Hint:", output)
+        self.assertIn("higantic doctor", output)
+        self.assertNotIn("\x1b", output)
+        self.assertNotIn("\u202e", output)
+
     def test_explicit_skills_command_uses_english_by_default(self):
         result = {
             "scope": "global",
@@ -180,7 +225,7 @@ class MainFlowTests(unittest.TestCase):
                     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                         code = HTML.main()
         self.assertEqual(code, 0)
-        self.assertIn('"authenticated": true', stdout.getvalue())
+        self.assertIn("Signed in to Agent A (agent-a) using profile 'default'.", stdout.getvalue())
         self.assertIn("Authentication succeeded", stderr.getvalue())
 
         stderr = io.StringIO()
@@ -195,6 +240,48 @@ class MainFlowTests(unittest.TestCase):
                         code = HTML.main()
         self.assertEqual(code, 0)
         self.assertIn("Authentication succeeded", stderr.getvalue())
+
+    def test_auth_json_is_explicit_and_suppresses_optional_skill_offer(self):
+        auth_result = {
+            "profile": "default",
+            "agentId": "agent-a",
+            "agentName": "Agent A",
+            "apiBaseUrl": "https://agent.higantic.com",
+            "scopes": ["html_artifacts:read"],
+            "authenticated": True,
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["higantic", "auth", "login", "--json"]):
+            with mock.patch.object(HTML, "execute_auth", return_value=auth_result):
+                with mock.patch.object(HTML, "offer_skills_after_login", return_value=None) as offer:
+                    with contextlib.redirect_stdout(stdout):
+                        self.assertEqual(HTML.main(), 0)
+        self.assertEqual(json.loads(stdout.getvalue()), auth_result)
+        offer.assert_called_once_with(True)
+
+    def test_human_auth_results_cover_profiles_use_and_logout(self):
+        profiles = HTML.format_auth_result("profiles", {
+            "environmentOverrideActive": False,
+            "profiles": [{"name": "work", "current": True, "agentName": "Agent A", "agentId": "agent-a"}],
+        })
+        self.assertIn("work: Agent A (agent-a) (active)", profiles)
+        self.assertEqual(HTML.format_auth_result("use", {"currentProfile": "work"}), "Profile 'work' is now active.")
+        self.assertIn("Revoked the API key", HTML.format_auth_result("logout", {"profile": "work", "revoked": True}))
+
+    def test_doctor_human_output_and_failure_exit_status(self):
+        result = {
+            "version": "1.5.2",
+            "status": "error",
+            "healthy": False,
+            "checks": [{"name": "HiGantic API", "status": "error", "message": "Could not connect."}],
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["higantic", "doctor"]):
+            with mock.patch.object(HTML, "run_doctor", return_value=result):
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(HTML.main(), 2)
+        self.assertIn("[ERROR] HiGantic API: Could not connect.", stdout.getvalue())
+        self.assertIn("Result: Problems found.", stdout.getvalue())
 
     def test_explicit_skills_command_returns_failure_status_for_failed_installs(self):
         result = {
