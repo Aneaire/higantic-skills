@@ -60,6 +60,36 @@
       "prompt": "Make the release report private again, but keep the contractor's pinned revision link working until it expires.",
       "expected_output": "The agent sets stable visibility to private immediately using the current artifact version, without revoking or rotating any pinned links, and clearly distinguishes the now-unavailable stable URL from the independently active immutable capability link.",
       "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Use the HiGantic HTML page ID page_release_reports that we already retained and create or update the release-readiness artifact with external ID mobile:release-readiness.",
+      "expected_output": "The retained valid page ID is used directly without pages list. The agent calls artifacts upsert directly with the stable externalId and does not make a redundant explicit artifacts lookup because the CLI performs the required read and optimistic preconditions internally.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Put a responsive architecture timeline in HiGantic. The first save says sanitization removed an SVG, an onclick handler, and two CSS declarations.",
+      "expected_output": "The agent replaces the SVG and onclick behavior with labeled semantic HTML/CSS, fixes the reported CSS declarations and unresolved variables, submits exactly one corrected revision/upsert with fresh preconditions, inspects its sanitization result, and truthfully reports any residual removals instead of looping.",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Create a HiGantic comparison artifact for PostgreSQL versus DynamoDB. Make it distinctive and mobile-friendly, but remember this is a static review surface.",
+      "expected_output": "The saved source uses semantic HTML, inline CSS, declared CSS variables, system fonts, accessible contrast, and static HTML/CSS comparisons. It contains no script, event handler, SVG, canvas, form/control, remote dependency, motion-dependent meaning, or fake interactive affordance.",
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "The HiGantic write succeeded. Tell me exactly what was saved and where I can review it.",
+      "expected_output": "The response reports the actual artifact title, revision, sanitization count/kinds, and API-returned dedicated private viewer URL. It does not invent preview actions, public status, interactivity, or features removed by sanitization.",
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "Make a polished responsive dashboard comparing our three onboarding experiments, and save the HTML beside the source files in this repository.",
+      "expected_output": "The HiGantic skill does not trigger because no HiGantic destination or existing HiGantic artifact context is present. The agent may create a local artifact using another appropriate workflow.",
+      "files": []
     }
   ]
 }
