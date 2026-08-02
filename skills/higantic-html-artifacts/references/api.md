@@ -4,6 +4,14 @@ Base path: `/v1/agents/{agentId}/html-pages`
 
 Authentication uses only `Authorization: Bearer <scoped-key>` sourced from `HIGANTIC_API_KEY`. Query-string keys and CLI key arguments are rejected/unsupported. Legacy unscoped keys cannot access `/v1`.
 
+## CLI profiles and browser login
+
+Interactive users should place `scripts/` on `PATH` and run `higantic auth login`. The CLI opens `/auth/device`, displays a matching one-time code, waits for explicit approval of one active agent and a nonempty requested-scope subset, then stores the issued key in macOS Keychain, Windows Credential Manager, or Linux Secret Service. The key is returned by the service once, is never written to profile metadata, and is never printed by the CLI.
+
+Use `higantic auth status`, `higantic auth use PROFILE`, and `higantic auth logout` to validate, select, and revoke profiles. An existing profile must be logged out before login/import can recreate it, ensuring the old exact key is revoked before replacement. `higantic auth import --stdin` is the only migration path for an existing scoped key; it accepts exactly one line and validates the key remotely. Protected-file storage is an explicit fallback requiring `--storage file --allow-protected-file`; it is never selected automatically.
+
+For CI or noninteractive use, set the complete `HIGANTIC_API_BASE_URL`, `HIGANTIC_AGENT_ID`, and `HIGANTIC_API_KEY` triple. If any member is set, all three are required, and the complete triple wins over profiles without mixing sources.
+
 ## API destination safety
 
 `HIGANTIC_API_BASE_URL` is parsed and validated before the CLI loads the bearer key. The exact official HTTPS origin `https://agent.higantic.com` is accepted by default. User information, queries, fragments, missing hosts, non-HTTP(S) schemes, and base paths containing dot traversal after percent-decoding are rejected. The normalized URL retains a deliberate base path without a trailing slash.

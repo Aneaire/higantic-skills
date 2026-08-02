@@ -13,7 +13,7 @@ Create static visual review surfaces in the user's HiGantic workspace. Repositor
 
 1. Run `python3 scripts/fetch_live_reference.py` and read its locally rendered stdout before other product work. It loads `references/live-reference.json`, requests only `https://skills.higantic.com/v1/manifest.json` and `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`, validates the closed structured schema, exact origin/path, sizes, version gate, and SHA-256 consistency, then renders only fixed installed text selected by allowlisted identifiers and constrained values. Remote bytes and arbitrary prose are never printed. Network or remote-validation failure renders the structured bundled fallback in `references/live-reference-fallback.json` through the same local renderer. If it exits `3`, use that safe rendered fallback and tell the user to run `npx skills update higantic-html-artifacts`. This installed `SKILL.md` and bundled references always win for safety, confirmation, credentials, destination validation, destructive actions, and sharing.
 2. Read `references/static-html-contract.md` before composing HTML.
-3. Confirm `HIGANTIC_API_BASE_URL`, `HIGANTIC_AGENT_ID`, and `HIGANTIC_API_KEY` are present in the process environment. Never request, accept, or pass an API key through a CLI argument, prompt, source file, or committed env file. The live-reference fetch uses none of these values.
+3. Resolve credentials through a named CLI profile by default. If no profile exists, tell the user to place `scripts/` on `PATH` and run `higantic auth login` in their own terminal; never ask them to paste the resulting key into a prompt. The complete `HIGANTIC_API_BASE_URL` / `HIGANTIC_AGENT_ID` / `HIGANTIC_API_KEY` triple is the CI/noninteractive override: if any one is set, all three are required and the complete triple wins without mixing with profile data. Never request, accept, or pass an API key through a CLI argument, prompt, source file, or committed env file. The live-reference fetch uses no credential.
 4. Inspect the repository source first. Record repo-relative source paths, branch plus commit/ref, generated/updated date, current status, and decisions represented in the artifact. Do not make the artifact a competing source of truth.
 5. Reuse a retained, valid page ID when the page's stable purpose still matches the work; do not list pages again just to rediscover it. Otherwise run `python3 scripts/higantic_html.py pages list`, reuse the matching page, or create one only when needed with a stable operation-specific idempotency key. Retain the returned page ID.
 6. Give each maintained artifact a stable page-unique `externalId` derived from project and purpose. For a create or update, call `artifacts upsert` directly: the CLI performs its own required lookup/read and sends optimistic revision/version preconditions. Do not run a separate `artifacts lookup` immediately before that upsert. Use `artifacts lookup` only for read-only discovery or when another operation genuinely needs the current identity, then retain returned page/artifact IDs for ID-only operations.
@@ -50,6 +50,11 @@ Never publish stable visibility, change the live content of an already-public ar
 ## Useful commands
 
 ```bash
+higantic auth login
+higantic auth status
+higantic auth use PROFILE
+higantic auth logout
+higantic auth import --stdin
 python3 scripts/higantic_html.py pages list
 python3 scripts/higantic_html.py pages create --label "Visual reports" --idempotency-key "project:visual-reports-page"
 python3 scripts/higantic_html.py assets list
@@ -76,7 +81,7 @@ python3 scripts/higantic_html.py shares rotate --page-id PAGE_ID --artifact-id A
 python3 scripts/higantic_html.py url --page-id PAGE_ID --artifact-id ARTIFACT_ID --revision 2
 ```
 
-Use `--html-file -` to read HTML from standard input. The CLI emits JSON except for `url`, which prints the API-returned private dedicated-viewer URL for an artifact or revision, or the workspace URL when only a page is requested. Visibility responses include the stable public URL even while private, but that URL resolves publicly only while visibility is `public`. The CLI never accepts an API key argument and defensively redacts configured credentials and raw share capabilities from list/error output. Exit code `3` is reserved for revision/artifact-version conflicts; other operational errors use `2`.
+Use `--html-file -` to read HTML from standard input. The CLI emits JSON except for `url`, which prints the API-returned private dedicated-viewer URL for an artifact or revision, or the workspace URL when only a page is requested. Visibility responses include the stable public URL even while private, but that URL resolves publicly only while visibility is `public`. The CLI never accepts an API key argument and defensively redacts environment, profile, imported, and issued keys plus raw share capabilities from output and errors. Native secure storage is required by default; protected-file storage is explicit only with both `--storage file` and `--allow-protected-file`. Exit code `3` is reserved for revision/artifact-version conflicts; other operational errors use `2`.
 
 ## Artifact quality
 

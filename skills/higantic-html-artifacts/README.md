@@ -20,7 +20,50 @@ The remote reference is closed-schema JSON with no descriptions, notes, Markdown
 
 Network or validation failure renders `references/live-reference-fallback.json` through the same local renderer. If `minimumInstalledVersion` exceeds the version in `references/live-reference.json`, the fallback is rendered and the script exits `3` with `npx skills update higantic-html-artifacts` guidance. Local `SKILL.md` safety, approval, credential, destination, destructive-action, and sharing rules remain authoritative.
 
-Set credentials only in the coding agent's process environment:
+## Authenticate with a profile
+
+For interactive use, place this skill's `scripts/` directory on `PATH` and run:
+
+```bash
+export PATH="$PWD/scripts:$PATH"
+higantic auth login
+higantic auth status
+```
+
+Windows PowerShell uses the included `higantic.cmd` launcher:
+
+```powershell
+$env:Path = "$PWD\scripts;$env:Path"
+higantic auth login
+higantic auth status
+```
+
+`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code on stderr, and waits for explicit approval of one active agent and a reviewed scope subset. Standard artifact scopes are requested by default; the high-trust `html_artifacts:share` scope is requested only with an explicit repeated `--scope` and is never preselected in the browser.
+
+Issued keys are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service through a validated `secret-tool` executable. Profile metadata contains no key and is stored at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
+
+Secure-storage failure is terminal. Protected-file storage is never selected automatically:
+
+```bash
+higantic auth login --storage file --allow-protected-file
+```
+
+POSIX protected storage enforces a user-owned, non-symlink `0700` directory and atomic `0600` file. Windows protected-file values use current-user DPAPI rather than plaintext. Pass `--allow-protected-file` again when using a profile configured with that storage.
+
+Profile commands:
+
+```bash
+higantic auth status                 # validates remotely
+higantic auth status --offline       # reads local metadata only
+higantic auth use PROFILE
+higantic auth logout                 # remote revoke, then local delete
+higantic auth logout --local-only    # explicit local-only escape hatch
+higantic auth import --stdin         # exactly one key line, remotely validated
+```
+
+Use global `--profile PROFILE` before an artifact command to override the current profile. Re-authentication is deliberately two-step: run `auth logout --profile PROFILE` so the exact old key is remotely revoked, then run login or import again. Logout confirms unless `--yes`, preserves the local credential when remote revocation fails, and never silently switches to another profile.
+
+For CI/noninteractive use, set all three environment variables:
 
 ```bash
 export HIGANTIC_API_BASE_URL="https://agent.higantic.com"
@@ -28,20 +71,18 @@ export HIGANTIC_AGENT_ID="your-agent-id"
 export HIGANTIC_API_KEY="your-scoped-key"
 ```
 
-The exact official origin `https://agent.higantic.com` is accepted by default. The CLI validates and normalizes the destination before loading the bearer key, rejects cross-origin redirects, and does not accept userinfo, queries, fragments, or path traversal in the base URL.
+If any member of the environment triple is set, all are required. A complete triple wins and is never combined with a profile destination or agent. The exact official origin is accepted by default. A trusted custom HTTPS origin requires `HIGANTIC_ALLOW_CUSTOM_API_BASE_URL=1`; loopback HTTP additionally requires `HIGANTIC_ALLOW_INSECURE_LOCALHOST=1`. Destination validation happens before a profile secret is read, and cross-origin redirects are rejected.
 
-A trusted non-official HTTPS origin requires `HIGANTIC_ALLOW_CUSTOM_API_BASE_URL=1`. This explicitly permits the API key to be sent to that custom origin, so use it only for infrastructure you control. Plain HTTP is allowed only for `127.0.0.1`, `localhost`, or `::1` when both `HIGANTIC_ALLOW_CUSTOM_API_BASE_URL=1` and `HIGANTIC_ALLOW_INSECURE_LOCALHOST=1` are set. Never enable the insecure-localhost override for a remote or production service.
-
-Generate a key in HiGantic agent settings with only the needed scopes:
+Grant only the scopes needed:
 
 - `html_artifacts:read` and `html_artifacts:write`
 - `html_assets:read` and `html_assets:write`
 - `html_pages:create` when page creation is required
-- `html_artifacts:share` only when the user deliberately needs stable publication or pinned capability links
+- `html_artifacts:share` only for deliberate stable publication or pinned capability links
 
-The secret is shown once and only its hash is stored. Do not place it in a repository, prompt, CLI argument, shell history, command transcript, or committed env file. The CLI intentionally has no API-key argument.
+Never place a key in a repository, prompt, CLI argument, shell history, command transcript, or committed environment file. The CLI registers environment, profile, imported, and issued keys for process-local redaction and never prints them. It intentionally has no API-key argument.
 
-Run `python3 scripts/higantic_html.py --help`. The script supports Python 3.9+ and has no third-party dependencies.
+Run `higantic --help` or `python3 scripts/higantic_html.py --help`. The launchers and modules support Python 3.9+ with no third-party dependencies.
 
 ## Operating model
 

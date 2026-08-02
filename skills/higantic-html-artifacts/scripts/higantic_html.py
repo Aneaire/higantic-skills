@@ -17,6 +17,17 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+from higantic_auth import (  # noqa: E402
+    AuthError,
+    execute_auth,
+    redact as redact_auth_secret,
+    resolve_credentials,
+)
+
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_SEGMENT_DECODE_ROUNDS = 10
@@ -44,7 +55,7 @@ SHARE_TOKEN_PATTERN = re.compile(r"\bhgs_[A-Za-z0-9_-]{20,}\b")
 
 
 def redact(value: Any) -> str:
-    text = str(value)
+    text = redact_auth_secret(value)
     secret = os.environ.get("HIGANTIC_API_KEY", "").strip()
     if secret:
         text = text.replace(secret, "[REDACTED]")
@@ -74,8 +85,7 @@ def safe_output(value: Any, allow_capability_url: bool = False) -> Any:
         return [safe_output(item, allow_capability_url=allow_capability_url) for item in value]
     if isinstance(value, str):
         if allow_capability_url:
-            secret = os.environ.get("HIGANTIC_API_KEY", "").strip()
-            return value.replace(secret, "[REDACTED]") if secret else value
+            return redact_auth_secret(value)
         return redact(value)
     return value
 
@@ -180,10 +190,11 @@ class SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 
 class Client:
-    def __init__(self) -> None:
-        self.base_url = validate_api_base_url(required_env("HIGANTIC_API_BASE_URL"))
-        self.agent_id = required_env("HIGANTIC_AGENT_ID")
-        self._key = required_env("HIGANTIC_API_KEY")
+    def __init__(self, profile: Optional[str] = None, allow_protected_file: bool = False) -> None:
+        credentials = resolve_credentials(profile, allow_protected_file)
+        self.base_url = credentials["apiBaseUrl"]
+        self.agent_id = credentials["agentId"]
+        self._key = credentials["apiKey"]
         self._opener = urllib.request.build_opener(SameOriginRedirectHandler())
         agent = segment(self.agent_id)
         self.agent_root = f"{self.base_url}/v1/agents/{agent}"
@@ -346,7 +357,38 @@ def add_artifact_identity_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage private-by-default HiGantic HTML artifacts without invoking an LLM.")
+    parser.add_argument("--profile", help="Use a named HiGantic profile when no complete environment override is set.")
+    parser.add_argument("--allow-protected-file", action="store_true", help="Allow an explicitly configured protected-file credential store.")
     groups = parser.add_subparsers(dest="group", required=True)
+
+    auth = groups.add_parser("auth", description="Manage secure HiGantic CLI profiles.")
+    auth_commands = auth.add_subparsers(dest="command", required=True)
+    login = auth_commands.add_parser("login")
+    login.add_argument("--profile", default=argparse.SUPPRESS)
+    login.add_argument("--api-base-url", help="Trusted HiGantic API origin; defaults to the official service.")
+    login.add_argument("--scope", action="append", help="Request one explicit scope; repeat for multiple scopes.")
+    login.add_argument("--no-browser", action="store_true")
+    login.add_argument("--storage", choices=("native", "file"))
+    login.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
+    status = auth_commands.add_parser("status")
+    status.add_argument("--profile", default=argparse.SUPPRESS)
+    status.add_argument("--offline", action="store_true")
+    status.add_argument("--json", action="store_true")
+    status.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
+    use = auth_commands.add_parser("use")
+    use.add_argument("name")
+    use.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
+    logout = auth_commands.add_parser("logout")
+    logout.add_argument("--profile", default=argparse.SUPPRESS)
+    logout.add_argument("--yes", action="store_true")
+    logout.add_argument("--local-only", action="store_true")
+    logout.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
+    imported = auth_commands.add_parser("import")
+    imported.add_argument("--profile", default=argparse.SUPPRESS)
+    imported.add_argument("--stdin", action="store_true", required=True)
+    imported.add_argument("--api-base-url", help="Trusted HiGantic API origin; defaults to the official service.")
+    imported.add_argument("--storage", choices=("native", "file"))
+    imported.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
 
     pages = groups.add_parser("pages")
     pages_commands = pages.add_subparsers(dest="command", required=True)
@@ -612,7 +654,22 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
 def main() -> int:
     try:
         args = build_parser().parse_args()
-        result = execute(Client(), args)
+        if args.group == "auth":
+            result = execute_auth(args)
+            printable = safe_output(result)
+            if args.command == "status" and not args.json:
+                profile = printable.get("profile") or printable.get("source")
+                mode = "offline" if printable.get("offline") else "remote"
+                print(f"Authenticated ({mode}) via {profile}")
+                print(f"Agent: {printable.get('agentName') or printable.get('agentId')}")
+                print(f"API: {printable.get('apiBaseUrl')}")
+                scopes = printable.get("scopes") or []
+                if scopes:
+                    print(f"Scopes: {', '.join(scopes)}")
+            else:
+                print(json.dumps(printable, indent=2, sort_keys=True))
+            return 0
+        result = execute(Client(args.profile, args.allow_protected_file), args)
         allow_capability_url = args.group == "shares" and args.command in ("create", "rotate")
         printable = safe_output(result, allow_capability_url=allow_capability_url)
         print(printable if args.group == "url" else json.dumps(printable, indent=2, sort_keys=True))
@@ -621,7 +678,7 @@ def main() -> int:
         if args.group == "visibility" and args.command == "set" and args.visibility == "public":
             print("Warning: the stable public URL is accessible to anyone and follows the artifact's current revision until visibility is set to private.", file=sys.stderr)
         return 0
-    except ApiError as error:
+    except (ApiError, AuthError) as error:
         conflict_codes = {"revision_conflict", "artifact_version_conflict"}
         suffix = " Refresh the artifact and reconcile before retrying." if error.code in conflict_codes else ""
         details = f" Details: {json.dumps(safe_output(error.details), sort_keys=True)}" if error.details is not None else ""

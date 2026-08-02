@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "skills" / "higantic-html-artifacts" / "scripts" / "higantic_html.py"
-SECRET = "hgk_test_secret_never_echo"
+SECRET = "hgk_" + "0123456789ab_0123456789abcdef0123456789abcdef0123456789abcdef"
 
 SPEC = importlib.util.spec_from_file_location("higantic_html", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)

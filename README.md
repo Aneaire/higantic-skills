@@ -61,9 +61,43 @@ npx skills add Aneaire/higantic-skills --list
 
 The skill has no third-party Python dependencies.
 
-## Credentials and scopes
+## Credentials, profiles, and scopes
 
-Configure credentials only in the coding agent's process environment:
+For interactive use, place the skill's scripts directory on `PATH` and use browser-approved profile login:
+
+```bash
+export PATH="$PWD/skills/higantic-html-artifacts/scripts:$PATH"
+higantic auth login
+higantic auth status
+```
+
+On Windows PowerShell, add the same scripts directory to the current session and use the included `.cmd` launcher:
+
+```powershell
+$env:Path = "$PWD\skills\higantic-html-artifacts\scripts;$env:Path"
+higantic auth login
+higantic auth status
+```
+
+The literal command is `higantic auth login` when that directory is on `PATH`; no package publication or global Python installation is required. Login shows a ten-minute code and URL on stderr, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
+
+- macOS Keychain through the Security framework.
+- Windows Credential Manager.
+- Linux Secret Service through a validated `secret-tool` executable, with the key passed on stdin.
+
+Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
+
+Secure storage fails closed. Protected-file storage is never automatic and requires both flags:
+
+```bash
+higantic auth login --storage file --allow-protected-file
+```
+
+The protected file uses a private `0700` directory and atomic `0600` file on POSIX; Windows encrypts values with current-user DPAPI. Commands using a protected-file profile must also pass `--allow-protected-file`.
+
+Use `higantic auth use PROFILE` to select a current profile, `higantic --profile PROFILE ...` for one artifact command, `higantic auth status --offline` for local metadata, and `higantic auth logout` to revoke the current key before local deletion. Re-authentication requires logout first so an old key is never abandoned. `higantic auth import --stdin` accepts exactly one key line for controlled migration and validates it remotely; keys are never accepted as arguments or printed.
+
+For CI and noninteractive automation, set the complete environment triple:
 
 ```bash
 export HIGANTIC_API_BASE_URL="https://agent.higantic.com"
@@ -71,9 +105,9 @@ export HIGANTIC_AGENT_ID="your-agent-id"
 export HIGANTIC_API_KEY="your-scoped-key"
 ```
 
-Never place an API key in a repository, prompt, CLI argument, shell history, command transcript, or committed environment file. The included CLI intentionally has no API-key argument.
+If any variable in the triple is set, all three are required. A complete triple wins over profiles and is never combined with a profile key. Never place an API key in a repository, prompt, CLI argument, shell history, command transcript, or committed environment file.
 
-The CLI accepts the exact official origin `https://agent.higantic.com` by default and validates the destination before loading the bearer key. A trusted non-official HTTPS origin requires explicit opt-in:
+The CLI accepts the exact official origin `https://agent.higantic.com` by default and validates the destination before reading a key. A trusted non-official HTTPS origin requires explicit opt-in:
 
 ```bash
 export HIGANTIC_ALLOW_CUSTOM_API_BASE_URL=1
