@@ -205,8 +205,8 @@ class ProfileCommandTests(unittest.TestCase):
                     return {
                         "device_code": "hgd_" + "A" * 43,
                         "user_code": "ABCD-EFGH",
-                        "verification_uri": "https://higantic.com/auth/device",
-                        "verification_uri_complete": "https://higantic.com/auth/device#code=ABCD-EFGH",
+                        "verification_uri": "https://www.higantic.com/auth/device",
+                        "verification_uri_complete": "https://www.higantic.com/auth/device#code=ABCD-EFGH",
                         "expires_in": 600,
                         "interval": 5,
                     }
