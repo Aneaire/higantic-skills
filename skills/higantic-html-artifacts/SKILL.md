@@ -56,6 +56,7 @@ higantic auth use PROFILE
 higantic auth logout
 higantic auth import --stdin
 higantic skills install
+higantic skills install --json
 python3 scripts/higantic_html.py pages list
 python3 scripts/higantic_html.py pages create --label "Visual reports" --idempotency-key "project:visual-reports-page"
 python3 scripts/higantic_html.py assets list

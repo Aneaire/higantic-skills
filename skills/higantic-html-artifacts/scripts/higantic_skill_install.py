@@ -176,6 +176,40 @@ def install_skills(selected: Optional[Sequence[str]] = None, assume_yes: bool = 
     return result
 
 
+def format_install_result(result: Dict[str, Any]) -> str:
+    names = {entry["slug"]: entry["name"] for entry in _catalog()}
+
+    def display_name(slug: str) -> str:
+        return names.get(slug, slug)
+
+    installed = [display_name(slug) for slug in result.get("installed", [])]
+    already_installed = [display_name(slug) for slug in result.get("alreadyInstalled", [])]
+    declined = [display_name(slug) for slug in result.get("declined", [])]
+    failed = result.get("failed", [])
+
+    if len(already_installed) == 1 and not installed and not declined and not failed:
+        return f"{already_installed[0]} is already installed globally."
+
+    lines = ["HiGantic skills installation summary:"]
+    if installed:
+        lines.append(f"  Installed globally: {', '.join(installed)}")
+    if already_installed:
+        lines.append(f"  Already installed: {', '.join(already_installed)}")
+    if declined:
+        lines.append(f"  Skipped: {', '.join(declined)}")
+    if failed:
+        failures = []
+        for item in failed:
+            slug = item.get("slug", "unknown") if isinstance(item, dict) else str(item)
+            code = item.get("code") if isinstance(item, dict) else None
+            label = display_name(slug)
+            failures.append(f"{label} ({code})" if code else label)
+        lines.append(f"  Failed: {', '.join(failures)}")
+    if len(lines) == 1:
+        lines.append("  No skills needed installation.")
+    return "\n".join(lines)
+
+
 def offer_skills_after_login(disabled: bool = False) -> Optional[Dict[str, Any]]:
     if disabled or not _interactive_terminal() or not missing_skills():
         return None

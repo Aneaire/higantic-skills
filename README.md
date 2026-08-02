@@ -93,7 +93,7 @@ Review the installed catalog again at any time:
 higantic skills install
 ```
 
-Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. The current public catalog contains `higantic-html-artifacts`, so an installation that already includes this CLI reports it as installed until more public HiGantic skills are released.
+The command prints a short English summary by default. Use `higantic skills install --json` when a script needs the structured result. Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. The current public catalog contains `higantic-html-artifacts`, so an installation that already includes this CLI reports it as installed until more public HiGantic skills are released.
 
 Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
 

@@ -30,6 +30,7 @@ from higantic_auth import (  # noqa: E402
 from higantic_skill_install import (  # noqa: E402
     SKILL_CATALOG,
     SkillInstallError,
+    format_install_result,
     install_skills,
     offer_skills_after_login,
 )
@@ -407,6 +408,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Review or install only this offered skill; repeat for more than one.",
     )
     install_skills_command.add_argument("--yes", action="store_true", help="Install every selected missing skill without prompting.")
+    install_skills_command.add_argument("--json", action="store_true", help="Print the installation result as JSON for scripts.")
 
     pages = groups.add_parser("pages")
     pages_commands = pages.add_subparsers(dest="command", required=True)
@@ -674,7 +676,8 @@ def main() -> int:
         args = build_parser().parse_args()
         if args.group == "skills":
             result = install_skills(args.skill, args.yes)
-            print(json.dumps(safe_output(result), indent=2, sort_keys=True))
+            printable = safe_output(result)
+            print(json.dumps(printable, indent=2, sort_keys=True) if args.json else format_install_result(printable))
             return 2 if result["failed"] else 0
         if args.group == "auth":
             result = execute_auth(args)

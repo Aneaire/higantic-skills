@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -39,10 +40,11 @@ FIXTURE_CATALOG = (
 class ParserTests(unittest.TestCase):
     def test_skills_install_and_login_offer_controls_are_available(self):
         parser = HTML.build_parser()
-        command = parser.parse_args(["skills", "install", "--skill", "higantic-html-artifacts", "--yes"])
+        command = parser.parse_args(["skills", "install", "--skill", "higantic-html-artifacts", "--yes", "--json"])
         self.assertEqual(command.group, "skills")
         self.assertEqual(command.skill, ["higantic-html-artifacts"])
         self.assertTrue(command.yes)
+        self.assertTrue(command.json)
         login = parser.parse_args(["auth", "login", "--no-skill-offer"])
         self.assertTrue(login.no_skill_offer)
 
@@ -130,6 +132,36 @@ class ProcessSafetyTests(unittest.TestCase):
 
 
 class MainFlowTests(unittest.TestCase):
+    def test_explicit_skills_command_uses_english_by_default(self):
+        result = {
+            "scope": "global",
+            "installed": [],
+            "alreadyInstalled": ["higantic-html-artifacts"],
+            "declined": [],
+            "failed": [],
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["higantic", "skills", "install"]):
+            with mock.patch.object(HTML, "install_skills", return_value=result):
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(HTML.main(), 0)
+        self.assertEqual(stdout.getvalue(), "HTML Artifacts is already installed globally.\n")
+
+    def test_explicit_skills_command_supports_json_for_scripts(self):
+        result = {
+            "scope": "global",
+            "installed": [],
+            "alreadyInstalled": ["higantic-html-artifacts"],
+            "declined": [],
+            "failed": [],
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["higantic", "skills", "install", "--json"]):
+            with mock.patch.object(HTML, "install_skills", return_value=result):
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(HTML.main(), 0)
+        self.assertEqual(json.loads(stdout.getvalue()), result)
+
     def test_successful_login_stays_successful_when_optional_install_fails(self):
         auth_result = {
             "profile": "default",

@@ -20,7 +20,7 @@ from higantic_secure_store import SecureStoreError, atomic_write, config_path, o
 
 OFFICIAL_API_ORIGIN = "https://agent.higantic.com"
 OFFICIAL_VERIFICATION_URI = "https://www.higantic.com/auth/device"
-CLI_USER_AGENT = "higantic-cli/1.5.0"
+CLI_USER_AGENT = "higantic-cli/1.5.1"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 DEFAULT_SCOPES = [
     "html_artifacts:read",
