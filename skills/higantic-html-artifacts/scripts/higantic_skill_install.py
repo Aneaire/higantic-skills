@@ -34,6 +34,11 @@ SKILL_CATALOG = (
         "name": "HTML Artifacts",
         "description": "Create and maintain safe, versioned HTML artifacts in HiGantic.",
     },
+    {
+        "slug": "higantic-excalidraw",
+        "name": "Excalidraw Canvas",
+        "description": "Create and maintain editable Excalidraw Canvas diagrams in HiGantic.",
+    },
 )
 
 

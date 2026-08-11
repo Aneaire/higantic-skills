@@ -1,0 +1,38 @@
+{
+  "skill_name": "higantic-excalidraw",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Put our 15-step release process into the Excalidraw Canvas in my HiGantic workspace. Use five stages, show approval decisions, and keep rollback/rework arrows from tangling with the main path.",
+      "expected_output": "Creates or reuses a HiGantic Canvas page, submits a semantic flowchart with stable IDs and labeled feedback paths, and reports persisted validation and identifiers.",
+      "files": [],
+      "assertions": [
+        "Lists existing Canvas pages before deciding whether to create one.",
+        "Uses semantic flowchart input with stable node IDs, five named stages, decision shapes, and labeled rollback or rework edges rather than hand-authored coordinates.",
+        "Reports returned page and scene identifiers, scene version, renderer, and persisted geometry validation instead of claiming success from the input alone."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Update the existing HiGantic architecture canvas scene SCENE_ID on page PAGE_ID from architecture.excalidraw, but don't overwrite anybody else's newer changes.",
+      "expected_output": "Reads the current scene, uses its returned version as the replacement precondition, handles conflicts without blind overwrite, and reports the new version.",
+      "files": ["architecture.excalidraw"],
+      "assertions": [
+        "Reads the exact existing scene before attempting replacement.",
+        "Uses the returned current version as expectedVersion on replacement.",
+        "Treats a scene_version_conflict as a reread-and-reconcile condition and never retries blindly."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Delete the old draft Canvas scene from my HiGantic agent.",
+      "expected_output": "Treats deletion as destructive, confirms exact intent and target, reads the latest version, and deletes only with explicit confirmation and the version precondition.",
+      "files": [],
+      "assertions": [
+        "Does not delete until the exact scene target and destructive intent are confirmed.",
+        "Reads the target scene immediately before deletion and uses its current version.",
+        "Sends the explicit delete confirmation and optimistic version precondition; it does not suggest page deletion."
+      ]
+    }
+  ]
+}

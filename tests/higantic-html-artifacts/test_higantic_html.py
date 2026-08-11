@@ -143,6 +143,8 @@ class Handler(BaseHTTPRequestHandler):
             "content_type": content_type,
             "asset_name": self.headers.get("X-Asset-Name"),
             "idempotency_key": self.headers.get("Idempotency-Key"),
+            "if_match": self.headers.get("If-Match"),
+            "confirm_delete": self.headers.get("X-Confirm-Delete"),
             "body": body,
             "raw": raw,
         })
@@ -200,6 +202,83 @@ class CliTests(unittest.TestCase):
         result = self.run_cli("pages", "list")
         self.assertEqual(result.returncode, 0)
         self.assertEqual(Handler.requests[0]["authorization"], f"Bearer {SECRET}")
+        self.assertNotIn(SECRET, result.stdout + result.stderr)
+
+    def test_canvas_pages_are_first_class_cli_commands(self):
+        Handler.queued_responses = [
+            (200, {"data": {"pages": []}}),
+            (201, {"data": {"page": {"id": "canvas-a", "label": "Release"}}}),
+        ]
+        listed = self.run_cli("canvas", "pages", "list")
+        created = self.run_cli("canvas", "pages", "create", "--label", "Release")
+        self.assertEqual(listed.returncode, 0)
+        self.assertEqual(created.returncode, 0)
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/excalidraw-pages")
+        self.assertEqual(Handler.requests[1]["method"], "POST")
+        self.assertEqual(Handler.requests[1]["body"], {"label": "Release"})
+
+    def test_canvas_scene_create_and_replace_send_json_and_version(self):
+        Handler.queued_responses = [
+            (201, {"data": {"scene": {"id": "scene-a", "version": 1}}}),
+            (200, {"data": {"scene": {"id": "scene-a", "version": 2}}}),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            flowchart = Path(directory) / "flow.json"
+            flowchart.write_text(json.dumps({
+                "direction": "left-to-right",
+                "nodes": [{"id": "start", "label": "Start"}],
+                "edges": [],
+            }), encoding="utf-8")
+            scene = Path(directory) / "scene.json"
+            scene.write_text(json.dumps({"type": "excalidraw", "version": 2, "elements": []}), encoding="utf-8")
+            created = self.run_cli(
+                "canvas", "scenes", "create", "--page-id", "canvas-a",
+                "--title", "Release", "--flowchart-file", str(flowchart),
+            )
+            replaced = self.run_cli(
+                "canvas", "scenes", "replace", "--page-id", "canvas-a",
+                "--scene-id", "scene-a", "--expected-version", "1",
+                "--scene-file", str(scene),
+            )
+        self.assertEqual(created.returncode, 0)
+        self.assertEqual(replaced.returncode, 0)
+        self.assertEqual(Handler.requests[0]["body"]["flowchart"]["nodes"][0]["id"], "start")
+        self.assertEqual(Handler.requests[1]["method"], "PUT")
+        self.assertEqual(Handler.requests[1]["body"]["expectedVersion"], 1)
+        self.assertIn("scene", Handler.requests[1]["body"])
+
+    def test_canvas_delete_requires_confirmation_and_sends_preconditions(self):
+        blocked = self.run_cli(
+            "canvas", "scenes", "delete", "--page-id", "canvas-a",
+            "--scene-id", "scene-a", "--expected-version", "7",
+        )
+        self.assertEqual(blocked.returncode, 2)
+        self.assertEqual(Handler.requests, [])
+
+        Handler.queued_responses = [(200, {"data": {"deleted": True, "sceneId": "scene-a"}})]
+        deleted = self.run_cli(
+            "canvas", "scenes", "delete", "--page-id", "canvas-a",
+            "--scene-id", "scene-a", "--expected-version", "7", "--confirm-delete",
+        )
+        self.assertEqual(deleted.returncode, 0)
+        self.assertEqual(Handler.requests[0]["method"], "DELETE")
+        self.assertEqual(Handler.requests[0]["if_match"], "7")
+        self.assertEqual(Handler.requests[0]["confirm_delete"], "true")
+
+    def test_canvas_conflict_uses_exit_code_three(self):
+        Handler.queued_responses = [(409, {
+            "error": {"code": "scene_version_conflict", "message": "Scene changed"},
+        })]
+        with tempfile.TemporaryDirectory() as directory:
+            scene = Path(directory) / "scene.json"
+            scene.write_text('{"type":"excalidraw","version":2,"elements":[]}', encoding="utf-8")
+            result = self.run_cli(
+                "canvas", "scenes", "replace", "--page-id", "canvas-a",
+                "--scene-id", "scene-a", "--expected-version", "1",
+                "--scene-file", str(scene),
+            )
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("reconcile", result.stderr)
         self.assertNotIn(SECRET, result.stdout + result.stderr)
 
     def test_create_commands_send_idempotency_and_external_keys(self):

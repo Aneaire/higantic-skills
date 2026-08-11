@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "slug": "higantic-excalidraw",
+  "updatedAt": "2026-08-11T00:00:00Z",
+  "supportedCapabilities": [
+    "canvas-pages",
+    "canvas-scenes",
+    "semantic-flowcharts"
+  ],
+  "supportedCommands": [
+    "pages.list",
+    "pages.create",
+    "scenes.list",
+    "scenes.get",
+    "scenes.create",
+    "scenes.replace",
+    "scenes.delete"
+  ],
+  "scopes": [
+    "excalidraw:read",
+    "excalidraw:write",
+    "excalidraw_pages:create"
+  ],
+  "features": {
+    "semanticLayoutSupported": true,
+    "optimisticConcurrencyRequired": true,
+    "rawSceneSupported": true,
+    "canvasPageDeletionSupported": false
+  },
+  "limits": {
+    "sceneSourceBytes": 786432,
+    "nodesPerFlowchart": 100,
+    "edgesPerFlowchart": 200,
+    "requestsPerMinutePerKey": 120,
+    "writesPerMinutePerKey": 30
+  }
+}

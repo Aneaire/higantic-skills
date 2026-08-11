@@ -62,6 +62,38 @@ export const LIMIT_KEYS = Object.freeze([
   "requestsPerMinutePerKey",
   "writesPerMinutePerKey",
 ]);
+const EXCALIDRAW_CAPABILITY_IDS = Object.freeze([
+  "canvas-pages",
+  "canvas-scenes",
+  "semantic-flowcharts",
+]);
+const EXCALIDRAW_COMMAND_IDS = Object.freeze([
+  "pages.list",
+  "pages.create",
+  "scenes.list",
+  "scenes.get",
+  "scenes.create",
+  "scenes.replace",
+  "scenes.delete",
+]);
+const EXCALIDRAW_SCOPE_IDS = Object.freeze([
+  "excalidraw:read",
+  "excalidraw:write",
+  "excalidraw_pages:create",
+]);
+const EXCALIDRAW_FEATURE_KEYS = Object.freeze([
+  "semanticLayoutSupported",
+  "optimisticConcurrencyRequired",
+  "rawSceneSupported",
+  "canvasPageDeletionSupported",
+]);
+const EXCALIDRAW_LIMIT_KEYS = Object.freeze([
+  "sceneSourceBytes",
+  "nodesPerFlowchart",
+  "edgesPerFlowchart",
+  "requestsPerMinutePerKey",
+  "writesPerMinutePerKey",
+]);
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -240,15 +272,21 @@ export function validateReference(reference, expectedSlug, label = "reference") 
   asciiString(reference.slug, SLUG_PATTERN, `${label}.slug`);
   if (reference.slug !== expectedSlug) fail(label, "slug does not match the manifest entry");
   timestamp(reference.updatedAt, `${label}.updatedAt`);
-  identifierArray(reference.supportedCapabilities, CAPABILITY_IDS, `${label}.supportedCapabilities`);
-  identifierArray(reference.supportedCommands, COMMAND_IDS, `${label}.supportedCommands`);
-  identifierArray(reference.scopes, SCOPE_IDS, `${label}.scopes`);
-  exactObject(reference.features, FEATURE_KEYS, `${label}.features`);
-  for (const key of FEATURE_KEYS) {
+  const isExcalidraw = expectedSlug === "higantic-excalidraw";
+  const capabilityIds = isExcalidraw ? EXCALIDRAW_CAPABILITY_IDS : CAPABILITY_IDS;
+  const commandIds = isExcalidraw ? EXCALIDRAW_COMMAND_IDS : COMMAND_IDS;
+  const scopeIds = isExcalidraw ? EXCALIDRAW_SCOPE_IDS : SCOPE_IDS;
+  const featureKeys = isExcalidraw ? EXCALIDRAW_FEATURE_KEYS : FEATURE_KEYS;
+  const limitKeys = isExcalidraw ? EXCALIDRAW_LIMIT_KEYS : LIMIT_KEYS;
+  identifierArray(reference.supportedCapabilities, capabilityIds, `${label}.supportedCapabilities`);
+  identifierArray(reference.supportedCommands, commandIds, `${label}.supportedCommands`);
+  identifierArray(reference.scopes, scopeIds, `${label}.scopes`);
+  exactObject(reference.features, featureKeys, `${label}.features`);
+  for (const key of featureKeys) {
     if (typeof reference.features[key] !== "boolean") fail(`${label}.features.${key}`, "must be boolean");
   }
-  exactObject(reference.limits, LIMIT_KEYS, `${label}.limits`);
-  for (const key of LIMIT_KEYS) {
+  exactObject(reference.limits, limitKeys, `${label}.limits`);
+  for (const key of limitKeys) {
     const value = reference.limits[key];
     if (!Number.isSafeInteger(value) || value < 0) fail(`${label}.limits.${key}`, "must be a nonnegative safe integer");
   }

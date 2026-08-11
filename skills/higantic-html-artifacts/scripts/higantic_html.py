@@ -39,6 +39,7 @@ from higantic_skill_install import (  # noqa: E402
 
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_CANVAS_INPUT_BYTES = 800 * 1024
 MAX_SEGMENT_DECODE_ROUNDS = 10
 OFFICIAL_API_ORIGIN = "https://agent.higantic.com"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
@@ -61,6 +62,85 @@ SENSITIVE_RESPONSE_KEYS = {
 }
 CAPABILITY_URL_PATTERN = re.compile(r"(?P<prefix>https?://[^\s\"'<>]+/s/)[^\s\"'<>/?#]+")
 SHARE_TOKEN_PATTERN = re.compile(r"\bhgs_[A-Za-z0-9_-]{20,}\b")
+
+ANSI = {
+    "bold": "1",
+    "dim": "2",
+    "red": "31",
+    "green": "32",
+    "amber": "33",
+    "cyan": "36",
+}
+_PARSER_ARGV: list[str] = []
+
+
+def color_enabled(stream: Any) -> bool:
+    return (
+        os.environ.get("NO_COLOR") is None
+        and os.environ.get("TERM", "").lower() != "dumb"
+        and bool(getattr(stream, "isatty", lambda: False)())
+    )
+
+
+def paint(value: str, *styles: str, stream: Any = None) -> str:
+    target = sys.stdout if stream is None else stream
+    if not styles or not color_enabled(target):
+        return value
+    codes = ";".join(ANSI[style] for style in styles)
+    return f"\033[{codes}m{value}\033[0m"
+
+
+def glyph(value: str, fallback: str, stream: Any = None) -> str:
+    target = sys.stdout if stream is None else stream
+    encoding = getattr(target, "encoding", None) or "utf-8"
+    try:
+        value.encode(encoding)
+        return value
+    except (LookupError, UnicodeEncodeError):
+        return fallback
+
+
+def status_line(title: str, tone: str = "cyan", stream: Any = None) -> str:
+    return f"{paint(glyph('◆', '*', stream), tone, stream=stream)} {paint(title, 'bold', stream=stream)}"
+
+
+def detail_lines(items: list[tuple[str, Any]]) -> list[str]:
+    visible = [(label, terminal_line(value)) for label, value in items if value not in (None, "", [])]
+    width = max((len(label) for label, _value in visible), default=0)
+    return [f"  {paint(label.ljust(width), 'dim')}  {value}" for label, value in visible]
+
+
+class HiGanticArgumentParser(argparse.ArgumentParser):
+    """Argparse with concise, branded recovery instead of internal parser prose."""
+
+    def parse_args(self, args: Any = None, namespace: Any = None) -> argparse.Namespace:
+        global _PARSER_ARGV
+        _PARSER_ARGV = list(sys.argv[1:] if args is None else args)
+        return super().parse_args(args, namespace)
+
+    def error(self, message: str) -> None:
+        argv = [terminal_line(value) for value in _PARSER_ARGV]
+        split_commands = {
+            ("auth", "log", "out"): "higantic auth logout",
+            ("auth", "log", "in"): "higantic auth login",
+            ("auth", "sign", "out"): "higantic auth logout",
+            ("auth", "sign", "in"): "higantic auth login",
+        }
+        suggestion = next(
+            (command for words, command in split_commands.items() if tuple(argv[: len(words)]) == words),
+            None,
+        )
+        print(status_line("Command not recognized", "red", sys.stderr), file=sys.stderr)
+        if suggestion:
+            print(f"\n{paint('Did you mean?', 'amber', stream=sys.stderr)}\n  {suggestion}", file=sys.stderr)
+        elif message.startswith("unrecognized arguments:"):
+            print("  Some options aren’t valid for this command.", file=sys.stderr)
+        elif "invalid choice:" in message:
+            print("  That command isn’t available.", file=sys.stderr)
+        else:
+            print(f"  {terminal_line(message)}", file=sys.stderr)
+        print(f"\n{paint('Try', 'dim', stream=sys.stderr)}  {self.prog} --help", file=sys.stderr)
+        self.exit(2)
 
 
 def redact(value: Any) -> str:
@@ -278,6 +358,20 @@ class Client:
             headers={"X-Asset-Name": name} if name is not None else None,
         )
 
+    def canvas_request(
+        self,
+        method: str,
+        path: str = "",
+        body: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        return self._request_url(
+            method,
+            f"{self.agent_root}/excalidraw-pages{path}",
+            body=body,
+            headers=headers,
+        )
+
 
 def segment(value: str) -> str:
     if not isinstance(value, str) or not value:
@@ -314,6 +408,36 @@ def read_image(path: str) -> tuple[bytes, str, str]:
     if len(data) > MAX_IMAGE_BYTES:
         raise ApiError(0, "payload_too_large", "The image exceeds the 10 MiB limit.")
     return data, mime_type, source.name
+
+
+def read_canvas_json(path_value: str) -> Any:
+    source = Path(path_value).expanduser()
+    if not source.is_file() or source.is_symlink():
+        raise ApiError(0, "invalid_input_file", "Canvas input must be a regular, non-symlink JSON file.")
+    if source.stat().st_size > MAX_CANVAS_INPUT_BYTES:
+        raise ApiError(0, "input_too_large", "Canvas input JSON exceeds 800 KiB.")
+    try:
+        return json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ApiError(0, "invalid_input_file", f"Canvas input is not valid UTF-8 JSON: {error}") from None
+
+
+def canvas_scene_payload(args: argparse.Namespace) -> Dict[str, Any]:
+    body: Dict[str, Any] = {}
+    if args.title is not None:
+        body["title"] = args.title
+    if args.flowchart_file is not None:
+        body["flowchart"] = read_canvas_json(args.flowchart_file)
+    else:
+        body["scene"] = read_canvas_json(args.scene_file)
+    return body
+
+
+def add_canvas_scene_source(parser: argparse.ArgumentParser) -> None:
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--flowchart-file", help="Semantic flowchart JSON; layout is generated by HiGantic.")
+    source.add_argument("--scene-file", help="Complete Excalidraw scene JSON.")
+    parser.add_argument("--title")
 
 
 def artifact_path(args: argparse.Namespace) -> str:
@@ -365,13 +489,18 @@ def add_artifact_identity_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Authenticate with HiGantic, install optional public skills, and manage private-by-default HTML artifacts without invoking an LLM.")
+    parser = HiGanticArgumentParser(
+        prog="higantic",
+        description="Sign in, check your setup, and manage HiGantic HTML artifacts and Canvas diagrams.",
+        epilog="Start with: higantic auth login\nAdd --help after any command to go deeper.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--version", action="version", version=f"HiGantic CLI {CLI_VERSION}")
     parser.add_argument("--profile", help="Use a named HiGantic profile when no complete environment override is set.")
     parser.add_argument("--allow-protected-file", action="store_true", help="Allow an explicitly configured protected-file credential store.")
     groups = parser.add_subparsers(dest="group", required=True)
 
-    auth = groups.add_parser("auth", description="Manage secure HiGantic CLI profiles.")
+    auth = groups.add_parser("auth", help="Sign in and manage profiles.", description="Sign in and manage secure HiGantic CLI profiles.")
     auth_commands = auth.add_subparsers(dest="command", required=True)
     login = auth_commands.add_parser("login")
     login.add_argument("--profile", default=argparse.SUPPRESS)
@@ -407,13 +536,13 @@ def build_parser() -> argparse.ArgumentParser:
     profiles = auth_commands.add_parser("profiles", description="List configured profile metadata without reading or printing API keys.")
     profiles.add_argument("--json", action="store_true")
 
-    doctor = groups.add_parser("doctor", description="Run read-only CLI, credential, dependency, and API diagnostics.")
+    doctor = groups.add_parser("doctor", help="Check CLI health and connectivity.", description="Run read-only CLI, credential, dependency, and API diagnostics.")
     doctor.add_argument("--profile", default=argparse.SUPPRESS)
     doctor.add_argument("--offline", action="store_true", help="Skip the authenticated API connectivity check.")
     doctor.add_argument("--json", action="store_true")
     doctor.add_argument("--allow-protected-file", action="store_true", default=argparse.SUPPRESS)
 
-    skills = groups.add_parser("skills", description="Review and install optional public HiGantic skills.")
+    skills = groups.add_parser("skills", help="Review optional HiGantic skills.", description="Review and install optional public HiGantic skills.")
     skill_commands = skills.add_subparsers(dest="command", required=True)
     install_skills_command = skill_commands.add_parser("install")
     install_skills_command.add_argument(
@@ -425,14 +554,42 @@ def build_parser() -> argparse.ArgumentParser:
     install_skills_command.add_argument("--yes", action="store_true", help="Install every selected missing skill without prompting.")
     install_skills_command.add_argument("--json", action="store_true", help="Print the installation result as JSON for scripts.")
 
-    pages = groups.add_parser("pages")
+    pages = groups.add_parser("pages", help="List or create HTML pages.")
     pages_commands = pages.add_subparsers(dest="command", required=True)
     pages_commands.add_parser("list")
     create_page = pages_commands.add_parser("create")
     create_page.add_argument("--label", required=True)
     create_page.add_argument("--idempotency-key")
 
-    artifacts = groups.add_parser("artifacts")
+    canvas = groups.add_parser("canvas", help="Manage Excalidraw Canvas pages and scenes.")
+    canvas_resources = canvas.add_subparsers(dest="canvas_resource", required=True)
+    canvas_pages = canvas_resources.add_parser("pages", help="List or create Canvas pages.")
+    canvas_page_actions = canvas_pages.add_subparsers(dest="canvas_action", required=True)
+    canvas_page_actions.add_parser("list")
+    canvas_page_create = canvas_page_actions.add_parser("create")
+    canvas_page_create.add_argument("--label", required=True)
+    canvas_scenes = canvas_resources.add_parser("scenes", help="Read or change Canvas scenes.")
+    canvas_scene_actions = canvas_scenes.add_subparsers(dest="canvas_action", required=True)
+    canvas_scene_list = canvas_scene_actions.add_parser("list")
+    canvas_scene_list.add_argument("--page-id", required=True)
+    canvas_scene_get = canvas_scene_actions.add_parser("get")
+    canvas_scene_get.add_argument("--page-id", required=True)
+    canvas_scene_get.add_argument("--scene-id", required=True)
+    canvas_scene_create = canvas_scene_actions.add_parser("create")
+    canvas_scene_create.add_argument("--page-id", required=True)
+    add_canvas_scene_source(canvas_scene_create)
+    canvas_scene_replace = canvas_scene_actions.add_parser("replace")
+    canvas_scene_replace.add_argument("--page-id", required=True)
+    canvas_scene_replace.add_argument("--scene-id", required=True)
+    canvas_scene_replace.add_argument("--expected-version", required=True, type=int)
+    add_canvas_scene_source(canvas_scene_replace)
+    canvas_scene_delete = canvas_scene_actions.add_parser("delete")
+    canvas_scene_delete.add_argument("--page-id", required=True)
+    canvas_scene_delete.add_argument("--scene-id", required=True)
+    canvas_scene_delete.add_argument("--expected-version", required=True, type=int)
+    canvas_scene_delete.add_argument("--confirm-delete", action="store_true")
+
+    artifacts = groups.add_parser("artifacts", help="Create and manage artifacts.")
     artifact_commands = artifacts.add_subparsers(dest="command", required=True)
     list_artifacts = artifact_commands.add_parser("list")
     list_artifacts.add_argument("--page-id", required=True)
@@ -462,7 +619,7 @@ def build_parser() -> argparse.ArgumentParser:
         if command == "delete":
             item.add_argument("--confirm-delete", action="store_true", help="Confirm deletion of the artifact and all revisions/shares.")
 
-    revisions = groups.add_parser("revisions")
+    revisions = groups.add_parser("revisions", help="Read and manage revisions.")
     revision_commands = revisions.add_subparsers(dest="command", required=True)
     for command in ("list", "get", "append", "restore"):
         item = revision_commands.add_parser(command)
@@ -474,7 +631,7 @@ def build_parser() -> argparse.ArgumentParser:
         if command in ("append", "restore"):
             item.add_argument("--confirm-public-sharing", action="store_true", help="Confirm replacing the live content of an already-public artifact.")
 
-    assets = groups.add_parser("assets")
+    assets = groups.add_parser("assets", help="Upload and manage images.")
     asset_commands = assets.add_subparsers(dest="command", required=True)
     asset_commands.add_parser("list")
     upload_asset = asset_commands.add_parser("upload")
@@ -483,7 +640,7 @@ def build_parser() -> argparse.ArgumentParser:
     delete_asset.add_argument("--asset-id", required=True)
     delete_asset.add_argument("--confirm-delete", action="store_true", help="Confirm removal of the managed asset record.")
 
-    visibility = groups.add_parser("visibility", description="Read or explicitly change stable artifact visibility.")
+    visibility = groups.add_parser("visibility", help="Inspect or change public visibility.", description="Read or explicitly change stable artifact visibility.")
     visibility_commands = visibility.add_subparsers(dest="command", required=True)
     get_visibility = visibility_commands.add_parser("get")
     add_artifact_identity_arguments(get_visibility)
@@ -492,7 +649,7 @@ def build_parser() -> argparse.ArgumentParser:
     set_visibility.add_argument("--visibility", required=True, choices=("private", "public"))
     set_visibility.add_argument("--confirm-public-sharing", action="store_true", help="Acknowledge that anyone can access the stable current-revision URL while public.")
 
-    shares = groups.add_parser("shares", description="Explicitly manage opt-in unlisted capability links.")
+    shares = groups.add_parser("shares", help="Manage opt-in unlisted links.", description="Explicitly manage opt-in unlisted capability links.")
     share_commands = shares.add_subparsers(dest="command", required=True)
     list_shares = share_commands.add_parser("list")
     add_artifact_identity_arguments(list_shares)
@@ -512,7 +669,7 @@ def build_parser() -> argparse.ArgumentParser:
     rotate_share.add_argument("--share-id", required=True)
     rotate_share.add_argument("--confirm-public-sharing", action="store_true", help="Acknowledge that the replacement link grants access to anyone who has it.")
 
-    url = groups.add_parser("url")
+    url = groups.add_parser("url", help="Print an artifact's private URL.")
     url.add_argument("--page-id", required=True)
     url.add_argument("--artifact-id")
     url.add_argument("--revision", type=int)
@@ -520,6 +677,28 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def execute(client: Client, args: argparse.Namespace) -> Any:
+    if args.group == "canvas":
+        if args.canvas_resource == "pages":
+            if args.canvas_action == "list":
+                return client.canvas_request("GET")
+            return client.canvas_request("POST", body={"label": args.label})
+        scenes_path = f"/{segment(args.page_id)}/scenes"
+        if args.canvas_action == "list":
+            return client.canvas_request("GET", scenes_path)
+        scene_path = f"{scenes_path}/{segment(args.scene_id)}" if getattr(args, "scene_id", None) else scenes_path
+        if args.canvas_action == "get":
+            return client.canvas_request("GET", scene_path)
+        if args.canvas_action == "create":
+            return client.canvas_request("POST", scene_path, canvas_scene_payload(args))
+        if args.canvas_action == "replace":
+            body = canvas_scene_payload(args)
+            body["expectedVersion"] = args.expected_version
+            return client.canvas_request("PUT", scene_path, body)
+        require_confirmation(args, "confirm_delete", "Canvas scene deletion requires --confirm-delete.")
+        return client.canvas_request("DELETE", scene_path, headers={
+            "If-Match": str(args.expected_version),
+            "X-Confirm-Delete": "true",
+        })
     if args.group == "assets":
         if args.command == "list":
             return client.assets_request("GET")
@@ -702,64 +881,67 @@ def _agent_label(result: Dict[str, Any]) -> str:
 def format_auth_result(command: str, result: Dict[str, Any]) -> str:
     if command in {"login", "import"}:
         profile = terminal_line(result.get("profile") or "default")
-        action = "Signed in to" if command == "login" else "Imported credentials for"
-        lines = [f"{action} {_agent_label(result)} using profile {profile!r}."]
-        if result.get("apiBaseUrl"):
-            lines.append(f"API: {terminal_line(result['apiBaseUrl'])}")
-        if result.get("storage"):
-            lines.append(f"Credential storage: {terminal_line(result['storage'])}")
+        action = "Signed in" if command == "login" else "Credentials imported"
+        lines = [status_line(action, "green")]
         scopes = result.get("scopes") or []
-        if scopes:
-            lines.append(f"Scopes: {', '.join(terminal_line(scope) for scope in scopes)}")
+        lines.extend(detail_lines([
+            ("Agent", _agent_label(result)),
+            ("Profile", profile),
+            ("API", result.get("apiBaseUrl")),
+            ("Storage", result.get("storage")),
+            ("Access", ", ".join(terminal_line(scope) for scope in scopes)),
+        ]))
         return "\n".join(lines)
     if command == "status":
         source = result.get("profile") or result.get("source") or "unknown"
         mode = "offline" if result.get("offline") else "remote"
-        lines = [
-            f"Authenticated ({mode}) using {terminal_line(source)}.",
-            f"Agent: {_agent_label(result)}",
-            f"API: {terminal_line(result.get('apiBaseUrl') or '')}",
-        ]
+        lines = [status_line("Authenticated", "green")]
         scopes = result.get("scopes") or []
-        if scopes:
-            lines.append(f"Scopes: {', '.join(terminal_line(scope) for scope in scopes)}")
+        lines.extend(detail_lines([
+            ("Agent", _agent_label(result)),
+            ("Profile", source),
+            ("Check", mode),
+            ("API", result.get("apiBaseUrl")),
+            ("Access", ", ".join(terminal_line(scope) for scope in scopes)),
+        ]))
         return "\n".join(lines)
     if command == "use":
-        return f"Profile {terminal_line(result.get('currentProfile') or '')!r} is now active."
+        profile = terminal_line(result.get("currentProfile") or "")
+        return "\n".join([status_line("Active profile changed", "green"), *detail_lines([("Profile", profile)])])
     if command == "logout":
         profile = terminal_line(result.get("profile") or "")
         if result.get("revoked"):
-            return f"Revoked the API key and removed profile {profile!r} from this device."
-        return f"Removed profile {profile!r} from this device without revoking its API key."
+            return "\n".join([status_line("Signed out", "green"), *detail_lines([("Profile", profile), ("API key", "Revoked")])])
+        return "\n".join([status_line("Profile removed", "amber"), *detail_lines([("Profile", profile), ("API key", "Not revoked (local-only)")])])
     if command == "profiles":
         profiles = result.get("profiles") or []
         lines = []
         if result.get("environmentOverrideActive"):
             lines.append("Environment credentials are active and currently override named profiles.")
         if not profiles:
-            lines.extend(["No HiGantic profiles are configured.", "Run: higantic auth login"])
+            lines.extend([status_line("No profiles yet", "amber"), "  Start with  higantic auth login"])
             return "\n".join(lines)
-        lines.append("Configured HiGantic profiles:")
+        lines.append(status_line("Profiles"))
         for profile in profiles:
-            marker = "*" if profile.get("current") else "-"
+            marker = glyph("◆", "*") if profile.get("current") else glyph("·", "-")
             name = terminal_line(profile.get("name") or "")
             agent = _agent_label(profile)
-            current = " (active)" if profile.get("current") else ""
-            lines.append(f"  {marker} {name}: {agent}{current}")
+            current = "  active" if profile.get("current") else ""
+            lines.append(f"  {marker} {name:<16} {agent}{paint(current, 'cyan')}")
         return "\n".join(lines)
     return json.dumps(result, indent=2, sort_keys=True)
 
 
 def format_doctor_result(result: Dict[str, Any]) -> str:
-    labels = {"ok": "OK", "warning": "WARN", "error": "ERROR", "skipped": "SKIP"}
-    lines = [f"HiGantic CLI {terminal_line(result.get('version') or '')} diagnostics"]
+    labels = {"ok": ("PASS", "green"), "warning": ("WARN", "amber"), "error": ("FAIL", "red"), "skipped": ("SKIP", "dim")}
+    lines = [status_line(f"HiGantic CLI {terminal_line(result.get('version') or '')}")]
     for check in result.get("checks", []):
-        status = labels.get(str(check.get("status")), "INFO")
+        status, tone = labels.get(str(check.get("status")), ("INFO", "cyan"))
         name = terminal_line(check.get("name") or "Check")
         message = terminal_line(check.get("message") or "")
-        lines.append(f"[{status}] {name}: {message}")
+        lines.append(f"  {paint(status.ljust(4), tone)}  {name:<18} {message}")
     outcome = {"ok": "Ready", "warning": "Ready with warnings", "error": "Problems found"}.get(result.get("status"), "Complete")
-    lines.append(f"Result: {outcome}.")
+    lines.append(f"\n{paint('Result', 'dim')}  {outcome}")
     return "\n".join(lines)
 
 
@@ -821,30 +1003,33 @@ def main() -> int:
             profile = str(error.details.get("profile", ""))
             if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", profile):
                 print(
-                    f"HiGantic profile {profile!r} is already configured.\n\n"
-                    "Check the current sign-in:\n"
+                    f"{status_line('Profile already exists', 'amber', sys.stderr)}\n"
+                    f"  Profile {profile!r} is already configured.\n\n"
+                    f"{paint('Check the current sign-in', 'dim', stream=sys.stderr)}\n"
                     f"  higantic auth status --profile {profile}\n\n"
-                    "To sign in again, revoke the old API key first:\n"
+                    f"{paint('Sign in again', 'dim', stream=sys.stderr)}\n"
                     f"  higantic auth logout --profile {profile}\n"
                     f"  higantic auth login --profile {profile}\n\n"
-                    "Or keep this profile and create another one:\n"
+                    f"{paint('Keep it and add another profile', 'dim', stream=sys.stderr)}\n"
                     "  higantic auth login --profile another-name",
                     file=sys.stderr,
                 )
                 return 2
-        conflict_codes = {"revision_conflict", "artifact_version_conflict"}
-        suffix = " Refresh the artifact and reconcile before retrying." if error.code in conflict_codes else ""
+        conflict_codes = {"revision_conflict", "artifact_version_conflict", "scene_version_conflict"}
+        suffix = " Refresh the resource and reconcile before retrying." if error.code in conflict_codes else ""
         details = f" Details: {json.dumps(safe_output(error.details), sort_keys=True)}" if error.details is not None else ""
-        print(f"HiGantic error [{terminal_line(error.code)}]: {terminal_line(error)}{details}{suffix}", file=sys.stderr)
+        print(status_line("Couldn’t complete that", "red", sys.stderr), file=sys.stderr)
+        print(f"  {terminal_line(error)}{details}{suffix}", file=sys.stderr)
+        print(f"  {paint('Code', 'dim', stream=sys.stderr)}  {terminal_line(error.code)}", file=sys.stderr)
         hint = error_hint(error.code)
         if hint:
-            print(f"Hint: {hint}", file=sys.stderr)
+            print(f"\n{paint('Next step', 'amber', stream=sys.stderr)}\n  {hint}", file=sys.stderr)
         return 3 if error.code in conflict_codes else 2
     except (OSError, ValueError) as error:
-        print(f"HiGantic CLI error: {terminal_line(error)}", file=sys.stderr)
+        print(f"{status_line('CLI error', 'red', sys.stderr)}\n  {terminal_line(error)}", file=sys.stderr)
         return 2
     except Exception as error:
-        print(f"HiGantic CLI error: {terminal_line(error)}", file=sys.stderr)
+        print(f"{status_line('CLI error', 'red', sys.stderr)}\n  {terminal_line(error)}", file=sys.stderr)
         return 2
 
 

@@ -19,8 +19,8 @@ from higantic_secure_store import SecureStoreError, atomic_write, config_path, o
 
 
 OFFICIAL_API_ORIGIN = "https://agent.higantic.com"
-OFFICIAL_VERIFICATION_URI = "https://www.higantic.com/auth/device"
-CLI_VERSION = "1.5.2"
+OFFICIAL_VERIFICATION_URI = "https://higantic.com/auth/device"
+CLI_VERSION = "1.6.0"
 CLI_USER_AGENT = f"higantic-cli/{CLI_VERSION}"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 DEFAULT_SCOPES = [
@@ -29,6 +29,9 @@ DEFAULT_SCOPES = [
     "html_assets:read",
     "html_assets:write",
     "html_pages:create",
+    "excalidraw:read",
+    "excalidraw:write",
+    "excalidraw_pages:create",
 ]
 ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "api:invoke"])
 MAX_API_RESPONSE_BYTES = 1024 * 1024

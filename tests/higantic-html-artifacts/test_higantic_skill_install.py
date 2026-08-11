@@ -157,7 +157,7 @@ class MainFlowTests(unittest.TestCase):
                 with contextlib.redirect_stderr(stderr):
                     self.assertEqual(HTML.main(), 2)
         output = stderr.getvalue()
-        self.assertIn("profile 'default' is already configured", output)
+        self.assertIn("Profile 'default' is already configured", output)
         self.assertIn("higantic auth status --profile default", output)
         self.assertIn("higantic auth logout --profile default", output)
         self.assertIn("higantic auth login --profile default", output)
@@ -172,7 +172,7 @@ class MainFlowTests(unittest.TestCase):
                 with contextlib.redirect_stderr(stderr):
                     self.assertEqual(HTML.main(), 2)
         output = stderr.getvalue()
-        self.assertIn("Hint:", output)
+        self.assertIn("Next step", output)
         self.assertIn("higantic doctor", output)
         self.assertNotIn("\x1b", output)
         self.assertNotIn("\u202e", output)
@@ -225,7 +225,9 @@ class MainFlowTests(unittest.TestCase):
                     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                         code = HTML.main()
         self.assertEqual(code, 0)
-        self.assertIn("Signed in to Agent A (agent-a) using profile 'default'.", stdout.getvalue())
+        self.assertIn("◆ Signed in", stdout.getvalue())
+        self.assertIn("Agent    Agent A (agent-a)", stdout.getvalue())
+        self.assertIn("Profile  default", stdout.getvalue())
         self.assertIn("Authentication succeeded", stderr.getvalue())
 
         stderr = io.StringIO()
@@ -264,9 +266,12 @@ class MainFlowTests(unittest.TestCase):
             "environmentOverrideActive": False,
             "profiles": [{"name": "work", "current": True, "agentName": "Agent A", "agentId": "agent-a"}],
         })
-        self.assertIn("work: Agent A (agent-a) (active)", profiles)
-        self.assertEqual(HTML.format_auth_result("use", {"currentProfile": "work"}), "Profile 'work' is now active.")
-        self.assertIn("Revoked the API key", HTML.format_auth_result("logout", {"profile": "work", "revoked": True}))
+        self.assertIn("◆ work", profiles)
+        self.assertIn("Agent A (agent-a)  active", profiles)
+        self.assertEqual(HTML.format_auth_result("use", {"currentProfile": "work"}), "◆ Active profile changed\n  Profile  work")
+        logout = HTML.format_auth_result("logout", {"profile": "work", "revoked": True})
+        self.assertIn("◆ Signed out", logout)
+        self.assertIn("API key  Revoked", logout)
 
     def test_doctor_human_output_and_failure_exit_status(self):
         result = {
@@ -280,8 +285,9 @@ class MainFlowTests(unittest.TestCase):
             with mock.patch.object(HTML, "run_doctor", return_value=result):
                 with contextlib.redirect_stdout(stdout):
                     self.assertEqual(HTML.main(), 2)
-        self.assertIn("[ERROR] HiGantic API: Could not connect.", stdout.getvalue())
-        self.assertIn("Result: Problems found.", stdout.getvalue())
+        self.assertIn("FAIL  HiGantic API", stdout.getvalue())
+        self.assertIn("Could not connect.", stdout.getvalue())
+        self.assertIn("Result  Problems found", stdout.getvalue())
 
     def test_explicit_skills_command_returns_failure_status_for_failed_installs(self):
         result = {

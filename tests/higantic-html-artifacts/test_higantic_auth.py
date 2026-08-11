@@ -117,6 +117,7 @@ class EnvironmentResolutionTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "custom_api_base_url_not_allowed")
 
     def test_verification_urls_are_pinned_and_never_allow_browser_protocol_injection(self):
+        self.assertEqual(AUTH.OFFICIAL_VERIFICATION_URI, "https://higantic.com/auth/device")
         valid = AUTH.validate_verification_urls(
             AUTH.OFFICIAL_API_ORIGIN,
             AUTH.OFFICIAL_VERIFICATION_URI,
@@ -140,6 +141,14 @@ class EnvironmentResolutionTests(unittest.TestCase):
 
 
 class ParserTests(unittest.TestCase):
+    def test_default_login_scopes_cover_private_html_and_canvas_without_sharing(self):
+        scopes = AUTH._requested_scopes(None)
+        self.assertIn("html_artifacts:read", scopes)
+        self.assertIn("excalidraw:read", scopes)
+        self.assertIn("excalidraw:write", scopes)
+        self.assertIn("excalidraw_pages:create", scopes)
+        self.assertNotIn("html_artifacts:share", scopes)
+
     def test_auth_commands_and_global_profile_are_available_without_key_argument(self):
         parser = HTML.build_parser()
         login = parser.parse_args(["--profile", "work", "auth", "login", "--no-browser", "--json"])
@@ -157,10 +166,34 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(doctor.group, "doctor")
         self.assertEqual(doctor.profile, "work")
         self.assertTrue(doctor.offline)
-        with self.assertRaises(SystemExit):
-            parser.parse_args(["auth", "login", "--replace"])
-        with self.assertRaises(SystemExit):
-            parser.parse_args(["auth", "import", "--stdin", "--api-key", KEY])
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["auth", "login", "--replace"])
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["auth", "import", "--stdin", "--api-key", KEY])
+
+    def test_split_auth_command_gets_a_concise_correction(self):
+        parser = HTML.build_parser()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as raised:
+                parser.parse_args(["auth", "log", "out"])
+        self.assertEqual(raised.exception.code, 2)
+        output = stderr.getvalue()
+        self.assertIn("◆ Command not recognized", output)
+        self.assertIn("higantic auth logout", output)
+        self.assertNotIn("argument command", output)
+        self.assertNotIn("higantic_html.py", output)
+
+    def test_parser_error_does_not_echo_unknown_option_values(self):
+        parser = HTML.build_parser()
+        secret = "not-a-real-key-but-never-print-this"
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["auth", "status", "--api-key", secret])
+        self.assertNotIn(secret, stderr.getvalue())
+        self.assertIn("Some options aren’t valid", stderr.getvalue())
 
 
 class ProfileCommandTests(unittest.TestCase):
@@ -213,8 +246,8 @@ class ProfileCommandTests(unittest.TestCase):
                     return {
                         "device_code": "hgd_" + "A" * 43,
                         "user_code": "ABCD-EFGH",
-                        "verification_uri": "https://www.higantic.com/auth/device",
-                        "verification_uri_complete": "https://www.higantic.com/auth/device#code=ABCD-EFGH",
+                        "verification_uri": "https://higantic.com/auth/device",
+                        "verification_uri_complete": "https://higantic.com/auth/device#code=ABCD-EFGH",
                         "expires_in": 600,
                         "interval": 5,
                     }
