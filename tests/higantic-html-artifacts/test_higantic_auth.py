@@ -117,7 +117,7 @@ class EnvironmentResolutionTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "custom_api_base_url_not_allowed")
 
     def test_verification_urls_are_pinned_and_never_allow_browser_protocol_injection(self):
-        self.assertEqual(AUTH.OFFICIAL_VERIFICATION_URI, "https://higantic.com/auth/device")
+        self.assertEqual(AUTH.OFFICIAL_VERIFICATION_URI, "https://dashboard.higantic.com/auth/device")
         valid = AUTH.validate_verification_urls(
             AUTH.OFFICIAL_API_ORIGIN,
             AUTH.OFFICIAL_VERIFICATION_URI,
@@ -247,8 +247,8 @@ class ProfileCommandTests(unittest.TestCase):
                     return {
                         "device_code": "hgd_" + "A" * 43,
                         "user_code": "ABCD-EFGH",
-                        "verification_uri": "https://higantic.com/auth/device",
-                        "verification_uri_complete": "https://higantic.com/auth/device#code=ABCD-EFGH",
+                        "verification_uri": "https://dashboard.higantic.com/auth/device",
+                        "verification_uri_complete": "https://dashboard.higantic.com/auth/device#code=ABCD-EFGH",
                         "expires_in": 600,
                         "interval": 5,
                     }
