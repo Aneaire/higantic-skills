@@ -582,12 +582,24 @@ def build_parser() -> argparse.ArgumentParser:
     canvas_scene_replace.add_argument("--page-id", required=True)
     canvas_scene_replace.add_argument("--scene-id", required=True)
     canvas_scene_replace.add_argument("--expected-version", required=True, type=int)
+    canvas_scene_replace.add_argument("--confirm-public-sharing", action="store_true", help="Confirm replacing a public Canvas scene.")
     add_canvas_scene_source(canvas_scene_replace)
     canvas_scene_delete = canvas_scene_actions.add_parser("delete")
     canvas_scene_delete.add_argument("--page-id", required=True)
     canvas_scene_delete.add_argument("--scene-id", required=True)
     canvas_scene_delete.add_argument("--expected-version", required=True, type=int)
     canvas_scene_delete.add_argument("--confirm-delete", action="store_true")
+    canvas_visibility = canvas_resources.add_parser("visibility", help="Inspect, publish, or privatize a Canvas scene.")
+    canvas_visibility_actions = canvas_visibility.add_subparsers(dest="canvas_action", required=True)
+    canvas_visibility_get = canvas_visibility_actions.add_parser("get")
+    canvas_visibility_get.add_argument("--page-id", required=True)
+    canvas_visibility_get.add_argument("--scene-id", required=True)
+    canvas_visibility_set = canvas_visibility_actions.add_parser("set")
+    canvas_visibility_set.add_argument("--page-id", required=True)
+    canvas_visibility_set.add_argument("--scene-id", required=True)
+    canvas_visibility_set.add_argument("--expected-version", required=True, type=int)
+    canvas_visibility_set.add_argument("--visibility", required=True, choices=("private", "public"))
+    canvas_visibility_set.add_argument("--confirm-public-sharing", action="store_true")
 
     artifacts = groups.add_parser("artifacts", help="Create and manage artifacts.")
     artifact_commands = artifacts.add_subparsers(dest="command", required=True)
@@ -682,6 +694,17 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
             if args.canvas_action == "list":
                 return client.canvas_request("GET")
             return client.canvas_request("POST", body={"label": args.label})
+        if args.canvas_resource == "visibility":
+            visibility_path = f"/{segment(args.page_id)}/scenes/{segment(args.scene_id)}/visibility"
+            if args.canvas_action == "get":
+                return client.canvas_request("GET", visibility_path)
+            if args.visibility == "public":
+                require_confirmation(args, "confirm_public_sharing", "Publishing requires --confirm-public-sharing.")
+            return client.canvas_request("PUT", visibility_path, {
+                "visibility": args.visibility,
+                "expectedVersion": args.expected_version,
+                "confirmPublicSharing": args.visibility == "public" and args.confirm_public_sharing,
+            })
         scenes_path = f"/{segment(args.page_id)}/scenes"
         if args.canvas_action == "list":
             return client.canvas_request("GET", scenes_path)
@@ -693,6 +716,7 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
         if args.canvas_action == "replace":
             body = canvas_scene_payload(args)
             body["expectedVersion"] = args.expected_version
+            body["confirmPublicWrite"] = args.confirm_public_sharing
             return client.canvas_request("PUT", scene_path, body)
         require_confirmation(args, "confirm_delete", "Canvas scene deletion requires --confirm-delete.")
         return client.canvas_request("DELETE", scene_path, headers={

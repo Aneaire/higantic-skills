@@ -11,6 +11,10 @@ Base route: `/v1/agents/{agentId}/excalidraw-pages`. Use `Authorization: Bearer 
 | GET | `/excalidraw-pages/{pageId}/scenes/{sceneId}` | `excalidraw:read` |
 | PUT | `/excalidraw-pages/{pageId}/scenes/{sceneId}` | `excalidraw:write` |
 | DELETE | `/excalidraw-pages/{pageId}/scenes/{sceneId}` | `excalidraw:write` |
+| GET | `/excalidraw-pages/{pageId}/scenes/{sceneId}/visibility` | `excalidraw:read` |
+| PUT | `/excalidraw-pages/{pageId}/scenes/{sceneId}/visibility` | `excalidraw:share` |
+
+New scenes are private. Scene responses include the private workspace `url`, stable `publicUrl`, and `visibility`. Publishing requires `confirmPublicSharing: true`; replacing a public scene requires `excalidraw:share` plus `confirmPublicWrite: true`.
 
 Create and replace accept exactly one of `flowchart` or `scene`. Replace also requires `expectedVersion`. Delete requires `If-Match: <version>` and `X-Confirm-Delete: true`.
 

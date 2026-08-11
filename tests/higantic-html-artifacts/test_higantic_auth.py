@@ -148,6 +148,7 @@ class ParserTests(unittest.TestCase):
         self.assertIn("excalidraw:write", scopes)
         self.assertIn("excalidraw_pages:create", scopes)
         self.assertNotIn("html_artifacts:share", scopes)
+        self.assertNotIn("excalidraw:share", scopes)
 
     def test_auth_commands_and_global_profile_are_available_without_key_argument(self):
         parser = HTML.build_parser()

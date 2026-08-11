@@ -91,6 +91,7 @@ Grant only the scopes needed:
 - `html_assets:read` and `html_assets:write`
 - `html_pages:create` when page creation is required
 - `excalidraw:read` and `excalidraw:write`
+- `excalidraw:share` only for explicit stable Canvas publishing
 - `excalidraw_pages:create` when Canvas page creation is required
 - `html_artifacts:share` only for deliberate stable publication or pinned capability links
 

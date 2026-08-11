@@ -33,7 +33,7 @@ DEFAULT_SCOPES = [
     "excalidraw:write",
     "excalidraw_pages:create",
 ]
-ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "api:invoke"])
+ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "excalidraw:share", "api:invoke"])
 MAX_API_RESPONSE_BYTES = 1024 * 1024
 MAX_CONFIG_BYTES = 64 * 1024
 MAX_IMPORT_BYTES = 4096

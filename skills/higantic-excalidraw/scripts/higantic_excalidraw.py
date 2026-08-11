@@ -152,6 +152,18 @@ def execute(args: argparse.Namespace) -> Any:
             return _request("GET", base)
         return _request("POST", base, {"label": args.label})
 
+    if args.group == "visibility":
+        visibility_path = base + "/" + _safe_id(args.page_id, "page ID") + "/scenes/" + _safe_id(args.scene_id, "scene ID") + "/visibility"
+        if args.action == "get":
+            return _request("GET", visibility_path)
+        if args.visibility == "public" and not args.confirm_public_sharing:
+            raise ApiError(0, "confirmation_required", "Publishing requires --confirm-public-sharing.")
+        return _request("PUT", visibility_path, {
+            "visibility": args.visibility,
+            "expectedVersion": args.expected_version,
+            "confirmPublicSharing": args.visibility == "public" and args.confirm_public_sharing,
+        })
+
     page_path = base + "/" + _safe_id(args.page_id, "page ID") + "/scenes"
     if args.action == "list":
         return _request("GET", page_path)
@@ -163,6 +175,7 @@ def execute(args: argparse.Namespace) -> Any:
     if args.action == "replace":
         payload = _payload_from_args(args)
         payload["expectedVersion"] = args.expected_version
+        payload["confirmPublicWrite"] = args.confirm_public_sharing
         return _request("PUT", scene_path, payload)
     if args.action == "delete":
         if not args.confirm_delete:
@@ -205,12 +218,25 @@ def build_parser() -> argparse.ArgumentParser:
     scene_replace.add_argument("--page-id", required=True)
     scene_replace.add_argument("--scene-id", required=True)
     scene_replace.add_argument("--expected-version", required=True, type=int)
+    scene_replace.add_argument("--confirm-public-sharing", action="store_true")
     _add_scene_source(scene_replace)
     scene_delete = scene_actions.add_parser("delete")
     scene_delete.add_argument("--page-id", required=True)
     scene_delete.add_argument("--scene-id", required=True)
     scene_delete.add_argument("--expected-version", required=True, type=int)
     scene_delete.add_argument("--confirm-delete", action="store_true")
+
+    visibility = groups.add_parser("visibility")
+    visibility_actions = visibility.add_subparsers(dest="action", required=True)
+    visibility_get = visibility_actions.add_parser("get")
+    visibility_get.add_argument("--page-id", required=True)
+    visibility_get.add_argument("--scene-id", required=True)
+    visibility_set = visibility_actions.add_parser("set")
+    visibility_set.add_argument("--page-id", required=True)
+    visibility_set.add_argument("--scene-id", required=True)
+    visibility_set.add_argument("--expected-version", required=True, type=int)
+    visibility_set.add_argument("--visibility", required=True, choices=("private", "public"))
+    visibility_set.add_argument("--confirm-public-sharing", action="store_true")
     return parser
 
 

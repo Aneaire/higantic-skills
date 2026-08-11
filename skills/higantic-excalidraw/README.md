@@ -26,6 +26,7 @@ Scopes:
 
 - `excalidraw:read` — list pages/scenes and read complete scene JSON.
 - `excalidraw:write` — create, replace, and delete scenes.
+- `excalidraw:share` — opt-in permission to publish stable read-only viewer links.
 - `excalidraw_pages:create` — create Canvas pages.
 
 The API key is never accepted as a command argument. Keep it in an operating-system or CI secret store and out of prompts, logs, repositories, and committed environment files.

@@ -44,9 +44,11 @@ higantic canvas scenes create --page-id PAGE_ID --title "Release workflow" --flo
 higantic canvas scenes create --page-id PAGE_ID --title "Architecture" --scene-file ./architecture.excalidraw
 higantic canvas scenes replace --page-id PAGE_ID --scene-id SCENE_ID --expected-version 4 --flowchart-file ./workflow.json
 higantic canvas scenes replace --page-id PAGE_ID --scene-id SCENE_ID --expected-version 4 --scene-file ./architecture.excalidraw
+higantic canvas visibility get --page-id PAGE_ID --scene-id SCENE_ID
+higantic canvas visibility set --page-id PAGE_ID --scene-id SCENE_ID --expected-version 4 --visibility public --confirm-public-sharing
 higantic canvas scenes delete --page-id PAGE_ID --scene-id SCENE_ID --expected-version 4 --confirm-delete
 ```
 
-Flowchart files contain `nodes`, optional `edges`, optional `direction`, title, and legend. Scene files contain complete Excalidraw JSON. The CLI emits JSON, never accepts a key argument, uses bearer authentication only, and reserves exit code `3` for optimistic version conflicts. If the unified launcher is unavailable, remove the `higantic canvas` prefix and run the corresponding command through `python3 scripts/higantic_excalidraw.py`.
+Flowchart files contain `nodes`, optional `edges`, optional `direction`, title, and legend. Scene files contain complete Excalidraw JSON. New scenes are private. Every create/get response includes the signed-in workspace `url`, stable `publicUrl`, and current `visibility`; only describe `publicUrl` as shareable after visibility is public. Publishing requires the opt-in `excalidraw:share` scope and `--confirm-public-sharing`. The CLI emits JSON, never accepts a key argument, uses bearer authentication only, and reserves exit code `3` for optimistic version conflicts. If the unified launcher is unavailable, remove the `higantic canvas` prefix and run the corresponding command through `python3 scripts/higantic_excalidraw.py`.
 
 Read `references/api.md` for routes, scopes, request shapes, limits, and conflict behavior.

@@ -21,6 +21,7 @@ higantic canvas scenes list / get
 higantic canvas scenes create    # semantic flowchart or complete scene JSON
 higantic canvas scenes replace   # optimistic version required
 higantic canvas scenes delete    # version and --confirm-delete required
+higantic canvas visibility get / set --visibility public|private
 higantic assets list             # list managed images
 higantic assets upload --file    # upload a PNG/JPEG/WebP/GIF
 higantic assets delete --asset-id ASSET_ID --confirm-delete
@@ -42,7 +43,7 @@ Every command group and subcommand has `--help`. Global `--profile PROFILE` over
 - **Identity**: page IDs come from `pages list`/`pages create`; artifacts use an immutable page-unique `externalId` for deterministic lookup/upsert. Retain returned IDs for ID-based commands.
 - **Idempotency**: `pages create` and `artifacts create` may pass `--idempotency-key` for exact create retries only; it never replaces `externalId`.
 - **Concurrency**: upsert, append, and restore send `expectedCurrentRevision`; metadata and visibility writes send `expectedArtifactVersion`; Canvas replacement and deletion require the latest scene version. Stale state returns a conflict and exit code `3`.
-- **Sharing is opt-in**: publish or pinned-link commands require `--confirm-public-sharing` (and the `html_artifacts:share` scope); deletion requires `--confirm-delete`.
+- **Sharing is opt-in**: HTML publish/pinned-link commands require `html_artifacts:share`; Canvas publishing requires `excalidraw:share`. Both require `--confirm-public-sharing`, while deletion requires `--confirm-delete`.
 - **Public content**: once an artifact is public, HTML upsert/append/restore also require `--confirm-public-sharing`, the share scope, and the latest artifact version.
 - **Redaction**: the CLI registers environment, profile, imported, and issued keys plus raw share capabilities for process-local redaction and never prints them. It intentionally has no API-key argument.
 - **Exit codes**: `0` success, `3` revision/artifact/scene version conflicts, `2` all other operational/configuration/API errors.

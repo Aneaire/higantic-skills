@@ -265,6 +265,27 @@ class CliTests(unittest.TestCase):
         self.assertEqual(Handler.requests[0]["if_match"], "7")
         self.assertEqual(Handler.requests[0]["confirm_delete"], "true")
 
+    def test_canvas_visibility_requires_confirmation_and_sends_version(self):
+        blocked = self.run_cli(
+            "canvas", "visibility", "set", "--page-id", "canvas-a",
+            "--scene-id", "scene-a", "--expected-version", "7", "--visibility", "public",
+        )
+        self.assertEqual(blocked.returncode, 2)
+        self.assertEqual(Handler.requests, [])
+
+        Handler.queued_responses = [(200, {"data": {"visibility": "public", "publicUrl": "https://higantic.com/c/scene-a"}})]
+        published = self.run_cli(
+            "canvas", "visibility", "set", "--page-id", "canvas-a",
+            "--scene-id", "scene-a", "--expected-version", "7", "--visibility", "public",
+            "--confirm-public-sharing",
+        )
+        self.assertEqual(published.returncode, 0)
+        self.assertEqual(Handler.requests[0]["method"], "PUT")
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/excalidraw-pages/canvas-a/scenes/scene-a/visibility")
+        self.assertEqual(Handler.requests[0]["body"], {
+            "visibility": "public", "expectedVersion": 7, "confirmPublicSharing": True,
+        })
+
     def test_canvas_conflict_uses_exit_code_three(self):
         Handler.queued_responses = [(409, {
             "error": {"code": "scene_version_conflict", "message": "Scene changed"},

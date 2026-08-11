@@ -65,6 +65,7 @@ export const LIMIT_KEYS = Object.freeze([
 const EXCALIDRAW_CAPABILITY_IDS = Object.freeze([
   "canvas-pages",
   "canvas-scenes",
+  "canvas-sharing",
   "semantic-flowcharts",
 ]);
 const EXCALIDRAW_COMMAND_IDS = Object.freeze([
@@ -75,10 +76,13 @@ const EXCALIDRAW_COMMAND_IDS = Object.freeze([
   "scenes.create",
   "scenes.replace",
   "scenes.delete",
+  "visibility.get",
+  "visibility.set",
 ]);
 const EXCALIDRAW_SCOPE_IDS = Object.freeze([
   "excalidraw:read",
   "excalidraw:write",
+  "excalidraw:share",
   "excalidraw_pages:create",
 ]);
 const EXCALIDRAW_FEATURE_KEYS = Object.freeze([

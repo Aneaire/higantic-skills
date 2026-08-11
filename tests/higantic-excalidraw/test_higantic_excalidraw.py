@@ -152,6 +152,28 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(request.get_header("If-match"), "9")
         self.assertEqual(request.get_header("X-confirm-delete"), "true")
 
+    def test_publish_requires_confirmation_and_sends_visibility_version(self):
+        with mock.patch.dict(os.environ, ENVIRONMENT, clear=True):
+            args = EXCALIDRAW.build_parser().parse_args([
+                "visibility", "set", "--page-id", "page-a", "--scene-id", "scene-a",
+                "--expected-version", "4", "--visibility", "public",
+            ])
+            with self.assertRaises(EXCALIDRAW.ApiError) as raised:
+                EXCALIDRAW.execute(args)
+        self.assertEqual(raised.exception.code, "confirmation_required")
+
+        opener = FakeOpener()
+        self.run_command([
+            "visibility", "set", "--page-id", "page-a", "--scene-id", "scene-a",
+            "--expected-version", "4", "--visibility", "public", "--confirm-public-sharing",
+        ], opener)
+        request, _timeout = opener.requests[0]
+        self.assertEqual(request.method, "PUT")
+        self.assertTrue(request.full_url.endswith("/page-a/scenes/scene-a/visibility"))
+        self.assertEqual(json.loads(request.data.decode("utf-8")), {
+            "visibility": "public", "expectedVersion": 4, "confirmPublicSharing": True,
+        })
+
     def test_version_conflict_returns_exit_three_and_redacts_key(self):
         payload = json.dumps({
             "error": {"code": "scene_version_conflict", "message": "Conflict for " + KEY},

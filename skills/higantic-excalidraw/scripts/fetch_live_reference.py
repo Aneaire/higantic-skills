@@ -36,6 +36,7 @@ ASCII_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]+$")
 CAPABILITY_TEXT = {
     "canvas-pages": "List existing Canvas pages and create one when required.",
     "canvas-scenes": "List, read, create, replace, and deliberately delete Canvas scenes.",
+    "canvas-sharing": "Publish or privatize stable read-only Canvas viewer links.",
     "semantic-flowcharts": "Submit semantic nodes and edges for deterministic server-side layout and validation.",
 }
 COMMAND_TEXT = {
@@ -46,10 +47,13 @@ COMMAND_TEXT = {
     "scenes.create": "scenes create",
     "scenes.replace": "scenes replace",
     "scenes.delete": "scenes delete",
+    "visibility.get": "visibility get",
+    "visibility.set": "visibility set",
 }
 SCOPE_TEXT = {
     "excalidraw:read": "list Canvas pages and scenes and read scene JSON",
     "excalidraw:write": "create, replace, and deliberately delete scenes",
+    "excalidraw:share": "publish stable read-only Canvas viewer links",
     "excalidraw_pages:create": "create Canvas pages",
 }
 FEATURE_TEXT = {

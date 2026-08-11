@@ -5,6 +5,7 @@
   "supportedCapabilities": [
     "canvas-pages",
     "canvas-scenes",
+    "canvas-sharing",
     "semantic-flowcharts"
   ],
   "supportedCommands": [
@@ -14,11 +15,14 @@
     "scenes.get",
     "scenes.create",
     "scenes.replace",
-    "scenes.delete"
+    "scenes.delete",
+    "visibility.get",
+    "visibility.set"
   ],
   "scopes": [
     "excalidraw:read",
     "excalidraw:write",
+    "excalidraw:share",
     "excalidraw_pages:create"
   ],
   "features": {
