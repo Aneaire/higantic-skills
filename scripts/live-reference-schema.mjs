@@ -16,8 +16,12 @@ export const COMMAND_IDS = Object.freeze([
   "pages.list",
   "pages.create",
   "assets.list",
+  "assets.show",
   "assets.upload",
   "assets.delete",
+  "assets.targets",
+  "assets.make_public",
+  "assets.make_private",
   "artifacts.list",
   "artifacts.create",
   "artifacts.lookup",
@@ -43,6 +47,7 @@ export const SCOPE_IDS = Object.freeze([
   "html_artifacts:share",
   "html_assets:read",
   "html_assets:write",
+  "html_assets:share",
   "html_pages:create",
 ]);
 export const FEATURE_KEYS = Object.freeze([

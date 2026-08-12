@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "higantic-html-artifacts",
-  "updatedAt": "2026-07-31T00:00:00Z",
+  "updatedAt": "2026-08-12T00:00:00Z",
   "supportedCapabilities": [
     "html-pages",
     "html-artifacts",
@@ -15,8 +15,12 @@
     "pages.list",
     "pages.create",
     "assets.list",
+    "assets.show",
     "assets.upload",
     "assets.delete",
+    "assets.targets",
+    "assets.make_public",
+    "assets.make_private",
     "artifacts.list",
     "artifacts.create",
     "artifacts.lookup",
@@ -42,6 +46,7 @@
     "html_artifacts:share",
     "html_assets:read",
     "html_assets:write",
+    "html_assets:share",
     "html_pages:create"
   ],
   "features": {

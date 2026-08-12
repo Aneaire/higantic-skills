@@ -23,7 +23,15 @@ higantic canvas scenes replace   # optimistic version required
 higantic canvas scenes delete    # version and --confirm-delete required
 higantic canvas visibility get / set --visibility public|private
 higantic assets list             # list managed images
-higantic assets upload --file    # upload a PNG/JPEG/WebP/GIF
+higantic assets list --target uploadthing
+higantic assets show --asset-id ASSET_ID
+higantic assets targets list     # discover available storage targets
+higantic assets targets status   # show profile default and availability
+higantic assets targets use uploadthing # save profile default
+higantic assets upload --file    # upload using the profile default
+higantic assets upload --file ./hero.png --target higantic # one-command override
+higantic assets make-public --asset-id ASSET_ID --confirm-public-sharing
+higantic assets make-private --asset-id ASSET_ID
 higantic assets delete --asset-id ASSET_ID --confirm-delete
 higantic artifacts list --page-id PAGE_ID
 higantic artifacts create        # create with an idempotency key
@@ -41,9 +49,11 @@ Every command group and subcommand has `--help`. Global `--profile PROFILE` over
 ## Key behavior
 
 - **Identity**: page IDs come from `pages list`/`pages create`; artifacts use an immutable page-unique `externalId` for deterministic lookup/upsert. Retain returned IDs for ID-based commands.
+- **Asset storage**: uploads default to HiGantic managed storage. A named profile can save `higantic` or a linked `uploadthing` app with `assets targets use`; `assets upload --target` overrides it once. The preference contains no provider token or bucket details. Complete environment credentials always default to `higantic` and use `--target` for an override.
+- **Standalone image visibility**: supported managed images stay private until `assets make-public --confirm-public-sharing` is called with `html_assets:share`. The returned `/i/{assetId}` viewer fits the image to the screen and proxies bytes without exposing provider URLs. `assets make-private` revokes it immediately.
 - **Idempotency**: `pages create` and `artifacts create` may pass `--idempotency-key` for exact create retries only; it never replaces `externalId`.
 - **Concurrency**: upsert, append, and restore send `expectedCurrentRevision`; metadata and visibility writes send `expectedArtifactVersion`; Canvas replacement and deletion require the latest scene version. Stale state returns a conflict and exit code `3`.
-- **Sharing is opt-in**: HTML publish/pinned-link commands require `html_artifacts:share`; Canvas publishing requires `excalidraw:share`. Both require `--confirm-public-sharing`, while deletion requires `--confirm-delete`.
+- **Sharing is opt-in**: HTML publish/pinned-link commands require `html_artifacts:share`, standalone image publishing requires `html_assets:share`, and Canvas publishing requires `excalidraw:share`. Publishing requires `--confirm-public-sharing`; deletion requires `--confirm-delete`, and deleting a public image also requires its share scope.
 - **Public content**: once an artifact is public, HTML upsert/append/restore also require `--confirm-public-sharing`, the share scope, and the latest artifact version.
 - **Redaction**: the CLI registers environment, profile, imported, and issued keys plus raw share capabilities for process-local redaction and never prints them. It intentionally has no API-key argument.
 - **Exit codes**: `0` success, `3` revision/artifact/scene version conflicts, `2` all other operational/configuration/API errors.

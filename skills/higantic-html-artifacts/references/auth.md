@@ -17,7 +17,8 @@ Interpretation:
 
 - `auth status` prints `Authenticated` with the agent, profile, check mode (`remote` or `offline`), API base URL, and granted scopes. A remote check reaches `GET /v1/auth/status` with the stored key.
 - `auth profiles` lists only non-secret metadata and never reads stored keys; the active profile is marked. If it reports no profiles yet, sign in first.
-- `doctor` runs checks for the CLI version, environment override, protected configuration, credential availability, authenticated API connectivity, secure-storage provider when relevant, and optional `npx` dependency. It prints `PASS`/`WARN`/`FAIL` per check, never prints a key, and exits nonzero only when a check fails. Missing optional setup is a warning.
+- `doctor` runs checks for the CLI version, environment override, protected configuration, credential availability, authenticated API connectivity, the selected asset-storage target, secure-storage provider when relevant, and optional `npx` dependency. It prints `PASS`/`WARN`/`FAIL` per check, never prints a key, and exits nonzero only when a check fails. Missing optional setup is a warning.
+- Named profiles may store a non-secret `assetDefaults.target` value of `higantic` or `uploadthing`. Existing version-1 configuration migrates in memory and defaults to `higantic`; the next write saves version 2. Complete environment credentials have no profile to mutate, default to `higantic`, and may use a one-command `--target` override.
 - All auth commands print concise English by default; pass `--json` for structured output for scripts. JSON login suppresses the optional skill catalog.
 
 ## Signing in
@@ -27,7 +28,7 @@ export PATH="$PWD/scripts:$PATH"   # or use the installed scripts/ directory
 higantic auth login                # ten-minute browser approval flow
 ```
 
-Login preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` scope is requested only with an explicit repeated `--scope` and is never preselected. After success, the CLI may offer to review missing public skills; each install is optional and has its own confirmation. Use `--no-skill-offer` to suppress the offer.
+Login preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` and `html_assets:share` scopes are requested only with explicit repeated `--scope` flags and are never preselected. After success, the CLI may offer to review missing public skills; each install is optional and has its own confirmation. Use `--no-skill-offer` to suppress the offer.
 
 Issued keys are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service and are returned once; the CLI never prints them and has no API-key argument. Never ask a user to paste a key into a prompt. Protected-file storage is explicit only with `--storage file --allow-protected-file`.
 
@@ -59,6 +60,7 @@ Grant only the scopes needed:
 
 - `html_artifacts:read` and `html_artifacts:write`
 - `html_assets:read` and `html_assets:write`
+- `html_assets:share` only for explicit standalone image publication or deletion of an already-public image
 - `html_pages:create` when page creation is required
 - `excalidraw:read` and `excalidraw:write`
 - `excalidraw:share` only when stable Canvas viewer links must be published

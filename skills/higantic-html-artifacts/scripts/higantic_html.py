@@ -22,11 +22,14 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from higantic_auth import (  # noqa: E402
+    ASSET_STORAGE_TARGETS,
     AuthError,
     CLI_VERSION,
     execute_auth,
     redact as redact_auth_secret,
+    resolve_asset_target,
     resolve_credentials,
+    set_profile_asset_target,
 )
 from higantic_diagnostics import run_doctor  # noqa: E402
 from higantic_skill_install import (  # noqa: E402
@@ -346,17 +349,35 @@ class Client:
         method: str,
         asset_id: Optional[str] = None,
         binary: Optional[bytes] = None,
+        body: Optional[Dict[str, Any]] = None,
         content_type: Optional[str] = None,
         name: Optional[str] = None,
+        target: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        action: Optional[str] = None,
     ) -> Dict[str, Any]:
         suffix = f"/{segment(asset_id)}" if asset_id is not None else ""
+        if action is not None:
+            if asset_id is None:
+                raise ApiError(0, "invalid_arguments", "Asset actions require --asset-id.")
+            suffix += f"/{segment(action)}"
+        query = f"?target={urllib.parse.quote(target, safe='')}" if method == "GET" and target is not None else ""
+        request_headers = dict(headers or {})
+        if name is not None:
+            request_headers["X-Asset-Name"] = name
+        if method == "POST" and target is not None:
+            request_headers["X-Asset-Target"] = target
         return self._request_url(
             method,
-            f"{self.agent_root}/html-assets{suffix}",
+            f"{self.agent_root}/html-assets{suffix}{query}",
+            body=body,
             binary=binary,
             content_type=content_type,
-            headers={"X-Asset-Name": name} if name is not None else None,
+            headers=request_headers or None,
         )
+
+    def asset_targets_request(self) -> Dict[str, Any]:
+        return self._request_url("GET", f"{self.agent_root}/html-asset-targets")
 
     def canvas_request(
         self,
@@ -645,12 +666,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     assets = groups.add_parser("assets", help="Upload and manage images.")
     asset_commands = assets.add_subparsers(dest="command", required=True)
-    asset_commands.add_parser("list")
+    list_assets = asset_commands.add_parser("list")
+    list_assets.add_argument("--target", choices=ASSET_STORAGE_TARGETS, help="Filter by one storage target; omit to list all managed images.")
+    show_asset = asset_commands.add_parser("show")
+    show_asset.add_argument("--asset-id", required=True)
+    make_public_asset = asset_commands.add_parser("make-public")
+    make_public_asset.add_argument("--asset-id", required=True)
+    make_public_asset.add_argument("--confirm-public-sharing", action="store_true", help="Confirm anyone with the stable URL may view or download the image.")
+    make_private_asset = asset_commands.add_parser("make-private")
+    make_private_asset.add_argument("--asset-id", required=True)
     upload_asset = asset_commands.add_parser("upload")
     upload_asset.add_argument("--file", required=True)
+    upload_asset.add_argument("--target", choices=ASSET_STORAGE_TARGETS, help="Override this profile's default storage target for one upload.")
     delete_asset = asset_commands.add_parser("delete")
     delete_asset.add_argument("--asset-id", required=True)
     delete_asset.add_argument("--confirm-delete", action="store_true", help="Confirm removal of the managed asset record.")
+    asset_targets = asset_commands.add_parser("targets", help="Discover targets or manage the profile default.")
+    asset_target_commands = asset_targets.add_subparsers(dest="target_command", required=True)
+    asset_target_commands.add_parser("list", help="List storage targets available to this agent.")
+    asset_target_commands.add_parser("status", help="Show the effective profile default and whether it is available.")
+    use_asset_target = asset_target_commands.add_parser("use", help="Save the default storage target for this profile.")
+    use_asset_target.add_argument("target", choices=ASSET_STORAGE_TARGETS)
 
     visibility = groups.add_parser("visibility", help="Inspect or change public visibility.", description="Read or explicitly change stable artifact visibility.")
     visibility_commands = visibility.add_subparsers(dest="command", required=True)
@@ -725,12 +761,53 @@ def execute(client: Client, args: argparse.Namespace) -> Any:
         })
     if args.group == "assets":
         if args.command == "list":
-            return client.assets_request("GET")
+            return client.assets_request("GET", target=args.target)
+        if args.command == "show":
+            return client.assets_request("GET", asset_id=args.asset_id)
+        if args.command == "make-public":
+            require_confirmation(
+                args,
+                "confirm_public_sharing",
+                "Publishing an image requires --confirm-public-sharing because anyone with the stable URL can view or download it.",
+            )
+            return client.assets_request(
+                "PUT",
+                asset_id=args.asset_id,
+                action="visibility",
+                body={"visibility": "public", "confirmPublicSharing": True},
+            )
+        if args.command == "make-private":
+            return client.assets_request(
+                "PUT",
+                asset_id=args.asset_id,
+                action="visibility",
+                body={"visibility": "private", "confirmPublicSharing": False},
+            )
         if args.command == "delete":
             require_confirmation(args, "confirm_delete", "Asset deletion requires --confirm-delete.")
-            return client.assets_request("DELETE", asset_id=args.asset_id)
+            return client.assets_request(
+                "DELETE",
+                asset_id=args.asset_id,
+                headers={"X-Confirm-Delete": "true"},
+            )
+        if args.command == "targets":
+            discovered = client.asset_targets_request()
+            targets = discovered.get("targets", [])
+            if args.target_command == "list":
+                return discovered
+            if args.target_command == "status":
+                effective = resolve_asset_target(getattr(args, "profile", None))
+                return {
+                    "target": effective,
+                    "available": any(item.get("target") == effective and item.get("available") is True for item in targets),
+                    "targets": targets,
+                }
+            if not any(item.get("target") == args.target and item.get("available") is True for item in targets):
+                raise ApiError(0, "asset_target_unavailable", f"The {args.target!r} asset target is not available for this agent.")
+            return set_profile_asset_target(getattr(args, "profile", None), args.target)
         data, mime_type, name = read_image(args.file)
-        return client.assets_request("POST", binary=data, content_type=mime_type, name=name)
+        target = resolve_asset_target(getattr(args, "profile", None), args.target)
+        return client.assets_request("POST", binary=data, content_type=mime_type, name=name, target=target)
     if args.group == "pages":
         return client.request("GET") if args.command == "list" else client.request(
             "POST",

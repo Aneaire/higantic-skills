@@ -20,7 +20,7 @@ from higantic_secure_store import SecureStoreError, atomic_write, config_path, o
 
 OFFICIAL_API_ORIGIN = "https://agent.higantic.com"
 OFFICIAL_VERIFICATION_URI = "https://dashboard.higantic.com/auth/device"
-CLI_VERSION = "1.6.0"
+CLI_VERSION = "1.7.0"
 CLI_USER_AGENT = f"higantic-cli/{CLI_VERSION}"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 DEFAULT_SCOPES = [
@@ -33,12 +33,13 @@ DEFAULT_SCOPES = [
     "excalidraw:write",
     "excalidraw_pages:create",
 ]
-ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "excalidraw:share", "api:invoke"])
+ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "html_assets:share", "excalidraw:share", "api:invoke"])
 MAX_API_RESPONSE_BYTES = 1024 * 1024
 MAX_CONFIG_BYTES = 64 * 1024
 MAX_IMPORT_BYTES = 4096
 PROFILE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SCOPED_KEY_PATTERN = re.compile(r"^hgk_[a-f0-9]{12}_[a-f0-9]{48}$")
+ASSET_STORAGE_TARGETS = ("higantic", "uploadthing")
 _REGISTERED_SECRETS: List[str] = []
 
 
@@ -178,7 +179,7 @@ def validate_profile_name(value: str) -> str:
 def load_config() -> Dict[str, Any]:
     path = config_path()
     if not path.exists():
-        return {"version": 1, "currentProfile": None, "profiles": {}}
+        return {"version": 2, "currentProfile": None, "profiles": {}}
     try:
         validate_private_file(path)
         raw = path.read_bytes()
@@ -187,13 +188,69 @@ def load_config() -> Dict[str, Any]:
         payload = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeDecodeError, ValueError, SecureStoreError) as error:
         raise AuthError(0, "invalid_config", f"Could not read HiGantic CLI config: {error}") from None
-    if not isinstance(payload, dict) or payload.get("version") != 1 or not isinstance(payload.get("profiles"), dict):
+    if not isinstance(payload, dict) or payload.get("version") not in (1, 2) or not isinstance(payload.get("profiles"), dict):
         raise AuthError(0, "invalid_config", "HiGantic CLI config has an invalid format.")
+    for name, record in payload["profiles"].items():
+        validate_profile_name(name)
+        if not isinstance(record, dict):
+            raise AuthError(0, "invalid_config", f"Profile {name!r} has an invalid format.")
+        defaults = record.get("assetDefaults")
+        if defaults is not None:
+            if not isinstance(defaults, dict) or set(defaults) != {"target"}:
+                raise AuthError(0, "invalid_config", f"Profile {name!r} has invalid asset defaults.")
+            validate_asset_storage_target(defaults.get("target"))
+    payload["version"] = 2
     return payload
 
 
 def save_config(config: Dict[str, Any]) -> None:
+    config["version"] = 2
     atomic_write(config_path(), json.dumps(config, indent=2, sort_keys=True).encode("utf-8"))
+
+
+def validate_asset_storage_target(value: Any) -> str:
+    target = str(value or "").strip().lower()
+    if target not in ASSET_STORAGE_TARGETS:
+        raise AuthError(0, "invalid_asset_target", "Asset storage target must be 'higantic' or 'uploadthing'.")
+    return target
+
+
+def profile_asset_target(record: Dict[str, Any]) -> str:
+    defaults = record.get("assetDefaults")
+    if defaults is None:
+        return "higantic"
+    if not isinstance(defaults, dict):
+        raise AuthError(0, "invalid_config", "The profile has invalid asset defaults.")
+    return validate_asset_storage_target(defaults.get("target"))
+
+
+def resolve_asset_target(explicit_profile: Optional[str], override: Optional[str] = None) -> str:
+    if override is not None:
+        return validate_asset_storage_target(override)
+    has_environment, _ = environment_state()
+    if has_environment:
+        return "higantic"
+    config = load_config()
+    name = _profile_name(explicit_profile, config)
+    record = config["profiles"].get(name)
+    if not isinstance(record, dict):
+        raise AuthError(0, "profile_not_found", f"HiGantic profile {name!r} does not exist.")
+    return profile_asset_target(record)
+
+
+def set_profile_asset_target(explicit_profile: Optional[str], target: str) -> Dict[str, Any]:
+    has_environment, _ = environment_state()
+    if has_environment:
+        raise AuthError(0, "environment_override_active", "Asset defaults belong to named profiles; use --target for this command or unset the environment credential override.")
+    selected = validate_asset_storage_target(target)
+    config = load_config()
+    name = _profile_name(explicit_profile, config)
+    record = config["profiles"].get(name)
+    if not isinstance(record, dict):
+        raise AuthError(0, "profile_not_found", f"HiGantic profile {name!r} does not exist.")
+    record["assetDefaults"] = {"target": selected}
+    save_config(config)
+    return {"profile": name, "target": selected, "saved": True}
 
 
 def environment_state() -> Tuple[bool, Dict[str, str]]:

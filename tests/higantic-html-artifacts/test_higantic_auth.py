@@ -148,7 +148,13 @@ class ParserTests(unittest.TestCase):
         self.assertIn("excalidraw:write", scopes)
         self.assertIn("excalidraw_pages:create", scopes)
         self.assertNotIn("html_artifacts:share", scopes)
+        self.assertNotIn("html_assets:share", scopes)
         self.assertNotIn("excalidraw:share", scopes)
+
+    def test_asset_share_scope_is_accepted_only_when_explicit(self):
+        self.assertEqual(AUTH._requested_scopes(["html_assets:share"]), ["html_assets:share"])
+        self.assertNotIn("html_assets:share", AUTH.DEFAULT_SCOPES)
+        self.assertIn("html_assets:share", AUTH.ALL_SCOPES)
 
     def test_auth_commands_and_global_profile_are_available_without_key_argument(self):
         parser = HTML.build_parser()
@@ -233,6 +239,40 @@ class ProfileCommandTests(unittest.TestCase):
         }
         defaults.update(values)
         return argparse.Namespace(**defaults)
+
+    def test_version_one_config_migrates_and_asset_default_is_profile_scoped(self):
+        self.config_path.write_text(json.dumps({
+            "version": 1,
+            "currentProfile": "work",
+            "profiles": {"work": {
+                "apiBaseUrl": AUTH.OFFICIAL_API_ORIGIN,
+                "agentId": "agent-a",
+                "storage": "native",
+            }},
+        }))
+        self.config_path.chmod(0o600)
+        migrated = AUTH.load_config()
+        self.assertEqual(migrated["version"], 2)
+        self.assertEqual(AUTH.resolve_asset_target(None), "higantic")
+        saved = AUTH.set_profile_asset_target(None, "uploadthing")
+        self.assertEqual(saved, {"profile": "work", "target": "uploadthing", "saved": True})
+        self.assertEqual(AUTH.resolve_asset_target(None), "uploadthing")
+        persisted = json.loads(self.config_path.read_text())
+        self.assertEqual(persisted["version"], 2)
+        self.assertEqual(persisted["profiles"]["work"]["assetDefaults"], {"target": "uploadthing"})
+
+    def test_asset_target_override_does_not_require_or_mutate_a_profile(self):
+        environment = {
+            "HIGANTIC_API_BASE_URL": AUTH.OFFICIAL_API_ORIGIN,
+            "HIGANTIC_AGENT_ID": "agent-env",
+            "HIGANTIC_API_KEY": KEY,
+        }
+        with mock.patch.dict(os.environ, environment, clear=True):
+            self.assertEqual(AUTH.resolve_asset_target(None), "higantic")
+            self.assertEqual(AUTH.resolve_asset_target(None, "uploadthing"), "uploadthing")
+            with self.assertRaises(AUTH.AuthError) as raised:
+                AUTH.set_profile_asset_target(None, "uploadthing")
+        self.assertEqual(raised.exception.code, "environment_override_active")
 
     def test_login_preflights_sleeps_before_poll_honors_slow_down_and_never_outputs_key(self):
         requests = []

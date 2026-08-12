@@ -11,6 +11,7 @@ from higantic_auth import (
     CLI_VERSION,
     environment_state,
     load_config,
+    profile_asset_target,
     resolve_credentials,
 )
 from higantic_secure_store import SecureStoreError, open_store
@@ -76,14 +77,31 @@ def run_doctor(
 
     if offline:
         _check(checks, "HiGantic API", "skipped", "Remote connectivity was skipped with --offline.")
+        if credentials is not None:
+            default_target = "higantic" if credentials["source"] == "environment" else profile_asset_target(credentials["record"])
+            _check(checks, "Asset storage", "skipped", f"Configured default is {default_target}; availability requires an online check.")
     elif credentials is None:
         _check(checks, "HiGantic API", "skipped", "Configure valid credentials before checking API connectivity.")
+        _check(checks, "Asset storage", "skipped", "Configure valid credentials before checking asset storage.")
     else:
+        client = AuthHttpClient(credentials["apiBaseUrl"])
         try:
-            AuthHttpClient(credentials["apiBaseUrl"]).request("GET", "/v1/auth/status", key=credentials["apiKey"])
+            client.request("GET", "/v1/auth/status", key=credentials["apiKey"])
             _check(checks, "HiGantic API", "ok", "Authentication and API connectivity are working.")
         except AuthError as error:
             _check(checks, "HiGantic API", "error", str(error))
+            _check(checks, "Asset storage", "skipped", "Fix API connectivity before checking asset storage.")
+        else:
+            try:
+                default_target = "higantic" if credentials["source"] == "environment" else profile_asset_target(credentials["record"])
+                data = client.request("GET", f"/v1/agents/{credentials['agentId']}/html-asset-targets", key=credentials["apiKey"])
+                available = any(item.get("target") == default_target and item.get("available") is True for item in data.get("targets", []))
+                if available:
+                    _check(checks, "Asset storage", "ok", f"The {default_target} default target is available.")
+                else:
+                    _check(checks, "Asset storage", "error", f"The {default_target} default target is not available for this agent.")
+            except AuthError as error:
+                _check(checks, "Asset storage", "error", str(error))
 
     installer = installer_available()
     _check(

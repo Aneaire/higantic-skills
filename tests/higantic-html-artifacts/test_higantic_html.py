@@ -142,6 +142,7 @@ class Handler(BaseHTTPRequestHandler):
             "authorization": self.headers.get("Authorization"),
             "content_type": content_type,
             "asset_name": self.headers.get("X-Asset-Name"),
+            "asset_target": self.headers.get("X-Asset-Target"),
             "idempotency_key": self.headers.get("Idempotency-Key"),
             "if_match": self.headers.get("If-Match"),
             "confirm_delete": self.headers.get("X-Confirm-Delete"),
@@ -457,6 +458,59 @@ class CliTests(unittest.TestCase):
         self.assertEqual(Handler.requests[0]["authorization"], f"Bearer {SECRET}")
         self.assertNotIn(SECRET, result.stdout + result.stderr)
 
+    def test_assets_list_can_filter_by_storage_target(self):
+        Handler.queued_responses = [(200, {"data": {"assets": []}})]
+        result = self.run_cli("assets", "list", "--target", "uploadthing")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-assets?target=uploadthing")
+
+    def test_assets_show_uses_single_asset_route(self):
+        Handler.queued_responses = [(200, {"data": {"asset": {"id": "asset-a", "visibility": "private"}}})]
+        result = self.run_cli("assets", "show", "--asset-id", "asset-a")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(Handler.requests[0]["method"], "GET")
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-assets/asset-a")
+        self.assertIsNone(Handler.requests[0]["body"])
+
+    def test_assets_make_public_requires_confirmation_then_sends_exact_json(self):
+        blocked = self.run_cli("assets", "make-public", "--asset-id", "asset-a")
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("confirm-public-sharing", blocked.stderr)
+        self.assertEqual(Handler.requests, [])
+
+        Handler.queued_responses = [(200, {"data": {"assetId": "asset-a", "visibility": "public"}})]
+        published = self.run_cli(
+            "assets", "make-public", "--asset-id", "asset-a", "--confirm-public-sharing",
+        )
+        self.assertEqual(published.returncode, 0)
+        self.assertEqual(Handler.requests[0]["method"], "PUT")
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-assets/asset-a/visibility")
+        self.assertEqual(Handler.requests[0]["body"], {
+            "visibility": "public",
+            "confirmPublicSharing": True,
+        })
+
+    def test_assets_make_private_sends_exact_json_without_confirmation(self):
+        Handler.queued_responses = [(200, {"data": {"assetId": "asset-a", "visibility": "private"}})]
+        result = self.run_cli("assets", "make-private", "--asset-id", "asset-a")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(Handler.requests[0]["method"], "PUT")
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-assets/asset-a/visibility")
+        self.assertEqual(Handler.requests[0]["body"], {
+            "visibility": "private",
+            "confirmPublicSharing": False,
+        })
+
+    def test_assets_request_rejects_binary_and_json_before_http(self):
+        client = object.__new__(MODULE.Client)
+        client.agent_root = "https://agent.higantic.com/v1/agents/agent-a"
+        client._key = SECRET
+        client._opener = mock.Mock()
+        with self.assertRaises(MODULE.ApiError) as raised:
+            client.assets_request("POST", binary=b"png", body={"visibility": "public"})
+        self.assertEqual(raised.exception.code, "invalid_arguments")
+        client._opener.open.assert_not_called()
+
     def test_assets_upload_sends_validated_binary_request_without_printing_key(self):
         Handler.queued_responses = [(201, {"data": {"asset": {"id": "asset-a", "embedSource": "higantic-asset://asset-a"}}})]
         with tempfile.TemporaryDirectory() as directory:
@@ -469,8 +523,32 @@ class CliTests(unittest.TestCase):
         self.assertEqual(request["path"], "/v1/agents/agent-a/html-assets")
         self.assertEqual(request["content_type"], "image/png")
         self.assertEqual(request["asset_name"], "hero.png")
+        self.assertEqual(request["asset_target"], "higantic")
         self.assertEqual(request["raw"], bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
         self.assertNotIn(SECRET, result.stdout + result.stderr)
+
+    def test_assets_upload_accepts_one_command_target_override(self):
+        Handler.queued_responses = [(201, {"data": {"asset": {"id": "asset-a", "storageTarget": "uploadthing"}}})]
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / "hero.png"
+            image.write_bytes(bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+            result = self.run_cli("assets", "upload", "--file", str(image), "--target", "uploadthing")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(Handler.requests[0]["asset_target"], "uploadthing")
+
+    def test_assets_targets_list_and_status_use_discovery_route(self):
+        response = {"data": {"targets": [
+            {"target": "higantic", "available": True, "label": "HiGantic managed storage"},
+            {"target": "uploadthing", "available": True, "label": "Linked UploadThing app"},
+        ]}}
+        Handler.queued_responses = [(200, response), (200, response)]
+        listed = self.run_cli("assets", "targets", "list")
+        status = self.run_cli("assets", "targets", "status")
+        self.assertEqual(listed.returncode, 0)
+        self.assertEqual(status.returncode, 0)
+        self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-asset-targets")
+        self.assertEqual(json.loads(status.stdout)["target"], "higantic")
+        self.assertTrue(json.loads(status.stdout)["available"])
 
     def test_delete_routes_require_confirmation_and_send_delete(self):
         unconfirmed_artifact = self.run_cli(
@@ -495,6 +573,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(Handler.requests[0]["path"], "/v1/agents/agent-a/html-pages/page-a/artifacts/artifact-a")
         self.assertEqual(Handler.requests[1]["method"], "DELETE")
         self.assertEqual(Handler.requests[1]["path"], "/v1/agents/agent-a/html-assets/asset-a")
+        self.assertEqual(Handler.requests[1]["confirm_delete"], "true")
 
     def test_invalid_destructive_identifiers_fail_before_any_request(self):
         commands = (

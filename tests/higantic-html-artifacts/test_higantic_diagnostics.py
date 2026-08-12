@@ -45,6 +45,7 @@ class DoctorTests(unittest.TestCase):
             "apiBaseUrl": "https://agent.higantic.com",
             "agentId": "agent-a",
             "apiKey": KEY,
+            "record": {},
         }
 
         class Client:
@@ -53,6 +54,8 @@ class DoctorTests(unittest.TestCase):
 
             def request(self, method, path, body=None, key=None):
                 self.key = key
+                if path.endswith("/html-asset-targets"):
+                    return {"targets": [{"target": "higantic", "available": True}]}
                 return {"agentId": "agent-a"}
 
         config = {"version": 1, "currentProfile": "work", "profiles": {"work": {}}}
@@ -73,6 +76,7 @@ class DoctorTests(unittest.TestCase):
             "apiBaseUrl": "https://agent.higantic.com",
             "agentId": "agent-a",
             "apiKey": KEY,
+            "record": {},
         }
 
         class Client:
@@ -113,6 +117,7 @@ class DoctorTests(unittest.TestCase):
             "apiBaseUrl": "https://agent.higantic.com",
             "agentId": "agent-a",
             "apiKey": KEY,
+            "record": {},
         }
         with mock.patch.object(DIAGNOSTICS, "environment_state", return_value=(False, {})):
             with mock.patch.object(DIAGNOSTICS, "load_config", return_value=config):

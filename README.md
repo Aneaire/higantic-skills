@@ -108,7 +108,9 @@ higantic doctor --offline
 higantic --version
 ```
 
-`doctor` checks the CLI version, environment override, protected configuration, credential availability, authenticated API connectivity, secure-storage provider when relevant, and optional `npx` dependency. It never prints a key and exits nonzero only when a check fails; missing optional setup is reported as a warning. Use `--json` for structured diagnostics.
+`doctor` checks the CLI version, environment override, protected configuration, credential availability, authenticated API connectivity, the selected asset-storage target, secure-storage provider when relevant, and optional `npx` dependency. It never prints a key and exits nonzero only when a check fails; missing optional setup is reported as a warning. Use `--json` for structured diagnostics. Managed image uploads default to HiGantic storage; `higantic assets targets list/status/use` manages a non-secret per-profile choice between it and an owner-linked UploadThing app, while `assets upload --target` overrides one upload.
+
+Use `higantic assets show --asset-id ID` to inspect one image. Standalone images remain private until `assets make-public --asset-id ID --confirm-public-sharing`; `assets make-private` revokes the stable public URL immediately. Publishing and deletion of an already-public image require the explicit, non-default `html_assets:share` scope. `assets delete --confirm-delete` is always destructive and sends an explicit server acknowledgement.
 
 Secure storage fails closed. Protected-file storage is never automatic and requires both flags:
 
