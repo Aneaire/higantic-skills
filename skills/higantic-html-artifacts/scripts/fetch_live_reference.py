@@ -75,9 +75,9 @@ SCOPE_TEXT = {
     "html_artifacts:read": "read artifacts and revisions",
     "html_artifacts:write": "create and modify artifacts and revisions",
     "html_artifacts:share": "publish stable URLs and manage pinned capability links",
-    "html_assets:read": "list managed assets",
-    "html_assets:write": "upload and delete managed assets",
-    "html_assets:share": "publish images and authorize deletion of public images",
+    "assets:read": "list managed assets",
+    "assets:write": "upload and delete managed assets",
+    "assets:share": "publish images and authorize deletion of public images",
     "html_pages:create": "create HTML Artifact pages",
 }
 FEATURE_TEXT = {

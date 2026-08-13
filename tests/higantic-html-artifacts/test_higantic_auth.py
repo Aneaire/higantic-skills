@@ -141,20 +141,30 @@ class EnvironmentResolutionTests(unittest.TestCase):
 
 
 class ParserTests(unittest.TestCase):
-    def test_default_login_scopes_cover_private_html_and_canvas_without_sharing(self):
+    def test_default_login_scopes_cover_private_html_assets_and_canvas_without_sharing(self):
         scopes = AUTH._requested_scopes(None)
         self.assertIn("html_artifacts:read", scopes)
+        self.assertIn("assets:read", scopes)
+        self.assertIn("assets:write", scopes)
         self.assertIn("excalidraw:read", scopes)
         self.assertIn("excalidraw:write", scopes)
         self.assertIn("excalidraw_pages:create", scopes)
         self.assertNotIn("html_artifacts:share", scopes)
-        self.assertNotIn("html_assets:share", scopes)
+        self.assertNotIn("assets:share", scopes)
         self.assertNotIn("excalidraw:share", scopes)
+        self.assertNotIn("html_assets:read", scopes)
+        self.assertNotIn("html_assets:write", scopes)
 
     def test_asset_share_scope_is_accepted_only_when_explicit(self):
-        self.assertEqual(AUTH._requested_scopes(["html_assets:share"]), ["html_assets:share"])
-        self.assertNotIn("html_assets:share", AUTH.DEFAULT_SCOPES)
-        self.assertIn("html_assets:share", AUTH.ALL_SCOPES)
+        self.assertEqual(AUTH._requested_scopes(["assets:share"]), ["assets:share"])
+        self.assertNotIn("assets:share", AUTH.DEFAULT_SCOPES)
+        self.assertIn("assets:share", AUTH.ALL_SCOPES)
+
+    def test_legacy_asset_scope_names_are_not_requested_by_the_latest_cli(self):
+        with self.assertRaises(AUTH.AuthError):
+            AUTH._requested_scopes(["html_assets:read"])
+        with self.assertRaises(AUTH.AuthError):
+            AUTH._requested_scopes(["html_assets:share"])
 
     def test_auth_commands_and_global_profile_are_available_without_key_argument(self):
         parser = HTML.build_parser()

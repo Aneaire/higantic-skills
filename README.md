@@ -110,7 +110,7 @@ higantic --version
 
 `doctor` checks the CLI version, environment override, protected configuration, credential availability, authenticated API connectivity, the selected asset-storage target, secure-storage provider when relevant, and optional `npx` dependency. It never prints a key and exits nonzero only when a check fails; missing optional setup is reported as a warning. Use `--json` for structured diagnostics. Managed image uploads default to HiGantic storage; `higantic assets targets list/status/use` manages a non-secret per-profile choice between it and an owner-linked UploadThing app, while `assets upload --target` overrides one upload.
 
-Use `higantic assets show --asset-id ID` to inspect one image. Standalone images remain private until `assets make-public --asset-id ID --confirm-public-sharing`; `assets make-private` revokes the stable public URL immediately. Publishing and deletion of an already-public image require the explicit, non-default `html_assets:share` scope. `assets delete --confirm-delete` is always destructive and sends an explicit server acknowledgement.
+Use `higantic assets show --asset-id ID` to inspect one image. Standalone images remain private until `assets make-public --asset-id ID --confirm-public-sharing`; `assets make-private` revokes the stable public URL immediately. Publishing and deletion of an already-public image require the explicit, non-default `assets:share` scope. `assets delete --confirm-delete` is always destructive and sends an explicit server acknowledgement.
 
 Secure storage fails closed. Protected-file storage is never automatic and requires both flags:
 
@@ -152,9 +152,12 @@ Never use the insecure-localhost override for remote or production services. Cro
 Grant only the scopes required for the intended operation:
 
 - `html_artifacts:read` and `html_artifacts:write` for artifacts and revisions.
-- `html_assets:read` and `html_assets:write` for managed images.
+- `assets:read` and `assets:write` for managed images.
+- `assets:share` only for deliberate standalone image publication or deletion of a public image.
 - `html_pages:create` only when the agent must create a page.
 - `html_artifacts:share` only for deliberate public capability-link operations.
+
+Existing issued keys may still contain legacy `html_assets:*` grants, which remain compatible aliases on asset routes. New CLI authorization requests use `assets:*`.
 
 Public sharing is never automatic. It requires explicit user intent, the non-default sharing scope, server-side support, and a confirmation flag. Replacing already-public content additionally binds that acknowledgement to the observed artifact version in the same backend transaction. Capability links are unlisted rather than access-controlled, so sanitize an artifact before sharing it.
 

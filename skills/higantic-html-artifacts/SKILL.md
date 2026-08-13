@@ -27,14 +27,14 @@ Create static visual review surfaces in the user's HiGantic workspace. Repositor
 
 - Page identity: reuse a stable page purpose/label and persist its returned page ID; use the same idempotency key only for exact create retries.
 - Artifact identity: use immutable `externalId` for deterministic lookup/upsert. An idempotency key protects one create request; it does not replace `externalId`.
-- Delete only after deliberate user intent. `artifacts delete --confirm-delete` removes the artifact, revisions, shares, snapshots, and associated retry records. `assets delete --confirm-delete` removes the live managed asset and invalidates its standalone public URL; deleting a public image also requires `html_assets:share`, while pinned share snapshots may retain referenced bytes.
+- Delete only after deliberate user intent. `artifacts delete --confirm-delete` removes the artifact, revisions, shares, snapshots, and associated retry records. `assets delete --confirm-delete` removes the live managed asset and invalidates its standalone public URL; deleting a public image also requires `assets:share`, while pinned share snapshots may retain referenced bytes.
 - HTML page deletion is not exposed. Delete contained artifacts individually.
 
 ## Sharing is opt-in
 
 Never publish stable visibility, change the live content of an already-public artifact, or create/rotate a pinned link unless the user explicitly asks. Sharing and public-content replacement require the non-default `html_artifacts:share` scope and server support. Artifact create/upsert never changes private visibility to public.
 
-Standalone managed images are also private by default. Publish only an explicitly approved PNG/JPEG/WebP/GIF with `assets make-public --confirm-public-sharing` and the non-default `html_assets:share` scope. Return the stable `/i/{assetId}` URL from the response; it is a no-store/noindex full-fit viewer that proxies the bytes. `assets make-private` revokes standalone access immediately without affecting published artifact snapshots.
+Standalone managed images are also private by default. Publish only an explicitly approved PNG/JPEG/WebP/GIF with `assets make-public --confirm-public-sharing` and the non-default `assets:share` scope. Return the stable `/i/{assetId}` URL from the response; it is a no-store/noindex full-fit viewer that proxies the bytes. `assets make-private` revokes standalone access immediately without affecting published artifact snapshots.
 
 - `visibility get` reads normalized private/public state, stable public URL, version, and update time with read scope.
 - `visibility set --visibility public` requires `--confirm-public-sharing`; the stable `/p/{artifactId}` URL follows the current revision until made private.

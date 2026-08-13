@@ -45,9 +45,9 @@ export const SCOPE_IDS = Object.freeze([
   "html_artifacts:read",
   "html_artifacts:write",
   "html_artifacts:share",
-  "html_assets:read",
-  "html_assets:write",
-  "html_assets:share",
+  "assets:read",
+  "assets:write",
+  "assets:share",
   "html_pages:create",
 ]);
 export const FEATURE_KEYS = Object.freeze([

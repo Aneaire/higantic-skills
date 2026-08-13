@@ -20,20 +20,20 @@ from higantic_secure_store import SecureStoreError, atomic_write, config_path, o
 
 OFFICIAL_API_ORIGIN = "https://agent.higantic.com"
 OFFICIAL_VERIFICATION_URI = "https://dashboard.higantic.com/auth/device"
-CLI_VERSION = "1.7.0"
+CLI_VERSION = "1.8.0"
 CLI_USER_AGENT = f"higantic-cli/{CLI_VERSION}"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 DEFAULT_SCOPES = [
     "html_artifacts:read",
     "html_artifacts:write",
-    "html_assets:read",
-    "html_assets:write",
+    "assets:read",
+    "assets:write",
     "html_pages:create",
     "excalidraw:read",
     "excalidraw:write",
     "excalidraw_pages:create",
 ]
-ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "html_assets:share", "excalidraw:share", "api:invoke"])
+ALL_SCOPES = set(DEFAULT_SCOPES + ["html_artifacts:share", "assets:share", "excalidraw:share", "api:invoke"])
 MAX_API_RESPONSE_BYTES = 1024 * 1024
 MAX_CONFIG_BYTES = 64 * 1024
 MAX_IMPORT_BYTES = 4096

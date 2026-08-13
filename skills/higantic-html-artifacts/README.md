@@ -38,7 +38,7 @@ higantic auth login
 higantic auth status
 ```
 
-`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` and `html_assets:share` scopes are requested only with explicit repeated `--scope` flags and are never preselected in the browser.
+`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` and `assets:share` scopes are requested only with explicit repeated `--scope` flags and are never preselected in the browser.
 
 After successful interactive login, the CLI offers to review missing public HiGantic skills. The catalog is optional, every missing skill has a separate yes/no prompt, installed skills are skipped, and optional installation cannot turn a successful authentication into a failure. Redirected or noninteractive login never prompts; use `auth login --no-skill-offer` to suppress the offer explicitly. Run `higantic skills install` to revisit the catalog or `higantic skills install --yes` for deliberate noninteractive installation of every missing offered skill. The command prints English by default; pass `--json` when a script needs its structured result. The fixed skills.sh child process receives no HiGantic credential or custom-origin environment variables, and failed processes expose only a bounded, control-free final reason.
 
@@ -90,13 +90,15 @@ If any member of the environment triple is set, all are required. A complete tri
 Grant only the scopes needed:
 
 - `html_artifacts:read` and `html_artifacts:write`
-- `html_assets:read` and `html_assets:write`
-- `html_assets:share` only for deliberate image publication or deletion of a public image
+- `assets:read` and `assets:write`
+- `assets:share` only for deliberate image publication or deletion of a public image
 - `html_pages:create` when page creation is required
 - `excalidraw:read` and `excalidraw:write`
 - `excalidraw:share` only for explicit stable Canvas publishing
 - `excalidraw_pages:create` when Canvas page creation is required
 - `html_artifacts:share` only for deliberate stable publication or pinned capability links
+
+Existing issued keys may still display legacy `html_assets:*` grants. The server accepts them as compatibility aliases on asset routes; new CLI requests use `assets:*`.
 
 Never place a key in a repository, prompt, CLI argument, shell history, command transcript, or committed environment file. The CLI registers environment, profile, imported, and issued keys for process-local redaction and never prints them. It intentionally has no API-key argument.
 

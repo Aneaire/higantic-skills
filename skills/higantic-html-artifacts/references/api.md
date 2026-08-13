@@ -27,11 +27,13 @@ Scopes:
 - `html_artifacts:read`: list pages/artifacts/revisions and read source.
 - `html_artifacts:write`: create, update, revise, restore, and delete artifacts.
 - `html_artifacts:share`: publish/unpublish stable visibility and list/create/revoke/rotate pinned capability shares; high-trust, non-default scope.
-- `html_assets:read`: list managed images.
-- `html_assets:write`: upload and delete managed images.
-- `html_assets:share`: publish or privatize standalone images and authorize deletion of a public image; high-trust, non-default scope.
+- `assets:read`: list managed images.
+- `assets:write`: upload and delete managed images.
+- `assets:share`: publish or privatize standalone images and authorize deletion of a public image; high-trust, non-default scope.
 - `html_pages:create`: create HTML Artifact pages.
 - `api:invoke`: invoke legacy user-defined `/api` endpoints; unrelated to artifact access.
+
+Existing issued keys with `html_assets:read`, `html_assets:write`, or `html_assets:share` remain compatible aliases on asset routes. New CLI requests and normative documentation use `assets:*`.
 
 Routes:
 
@@ -94,7 +96,7 @@ Do not share artifacts containing credentials, personal/private data, confidenti
 
 `GET /html-asset-targets` returns the storage targets available to the agent. `higantic` is always available; `uploadthing` appears only when the owner has linked a usable UploadThing app credential. This selects an UploadThing app, not a raw S3 bucket. Provider tokens remain server-side.
 
-`GET /html-assets/{assetId}` inspects one same-agent image. `GET|PUT /html-assets/{assetId}/visibility` reads or changes normalized standalone visibility. Publishing requires `html_assets:share` and `confirmPublicSharing: true`; making private needs no confirmation. Only managed PNG/JPEG/WebP/GIF records with available storage are publishable. The stable `/i/{assetId}` page contains the image fully within the viewport and proxies validated bytes without revealing storage/provider URLs. It is no-store/noindex, and private, deleted, unsupported, or unavailable images return the same generic 404.
+`GET /html-assets/{assetId}` inspects one same-agent image. `GET|PUT /html-assets/{assetId}/visibility` reads or changes normalized standalone visibility. Publishing requires `assets:share` and `confirmPublicSharing: true`; making private needs no confirmation. Only managed PNG/JPEG/WebP/GIF records with available storage are publishable. The stable `/i/{assetId}` page contains the image fully within the viewport and proxies validated bytes without revealing storage/provider URLs. It is no-store/noindex, and private, deleted, unsupported, or unavailable images return the same generic 404.
 
 Asset upload accepts a binary PNG/JPEG/WebP/GIF body with matching magic bytes, `X-Asset-Name`, an optional `X-Asset-Target: higantic|uploadthing`, and a 10 MiB maximum. Missing target defaults to `higantic` for API compatibility. `GET /html-assets?target=...` filters the list. UploadThing V1 accepts public-read objects only so stable public artifacts and pinned snapshots remain durable without credential-bearing URLs. Use returned `higantic-asset://<assetId>` references, never provider/storage URLs. The service never imports remote images.
 
