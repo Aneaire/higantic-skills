@@ -4,7 +4,7 @@
   "description": "Official command-line interface for HiGantic authentication, diagnostics, HTML Artifacts, managed images, and Canvas diagrams.",
   "type": "module",
   "bin": {
-    "higantic": "./bin/higantic.js"
+    "higantic": "bin/higantic.js"
   },
   "files": [
     "bin/",
