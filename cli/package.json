@@ -1,0 +1,36 @@
+{
+  "name": "@higantic/cli",
+  "version": "1.8.0",
+  "description": "Official command-line interface for HiGantic authentication, diagnostics, HTML Artifacts, managed images, and Canvas diagrams.",
+  "type": "module",
+  "bin": {
+    "higantic": "./bin/higantic.js"
+  },
+  "files": [
+    "bin/",
+    "higantic_cli/*.py",
+    "LICENSE",
+    "README.md",
+    "pyproject.toml"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "prepack": "npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aneaire/higantic-skills.git",
+    "directory": "cli"
+  },
+  "homepage": "https://higantic.com/docs/cli/quickstart",
+  "bugs": {
+    "url": "https://github.com/Aneaire/higantic-skills/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -8,7 +8,17 @@ Public agent skills for creating clear, reviewable work in HiGantic. These skill
 
 Creates and maintains safe, versioned, static HTML artifacts when a user explicitly chooses a HiGantic workspace, page, or artifact as the destination. It does not activate for generic report or visualization requests with no HiGantic destination.
 
-The included dependency-free Python CLI supports stable page and artifact identity, optimistic concurrency, managed images, explicit deletion safeguards, and opt-in capability sharing.
+The skill retains a compatibility launcher for existing installations. New installations use the standalone dependency-free Python CLI under `cli/`.
+
+## Standalone CLI
+
+The `@higantic/cli` npm application is separate from agent skills:
+
+```bash
+npm install --global @higantic/cli
+```
+
+This creates the `higantic` command without installing HTML Artifacts or Excalidraw agent instructions.
 
 ## Branded live references
 
@@ -18,9 +28,9 @@ Each manifest-declared skill packages `scripts/fetch_live_reference.py`, `refere
 
 The source manifest and generated manifest are each limited to 64 KiB, as is every source/generated reference. Live structured state cannot override installed `SKILL.md` safety, approval, credential, destination, destructive-action, or sharing rules. A newer executable contract requires `npx skills update <skill-slug>`. This convention is required for future skills, while installable payloads remain limited to `SKILL.md`, `README.md`, `scripts/`, and `references/`.
 
-## Install with skills.sh
+## Install agent skills with skills.sh
 
-The permanent source for this collection is `Aneaire/higantic-skills`. The commands below use the `skills` CLI through `npx`; this repository does not claim or require a separately published HiGantic npm package.
+The permanent source for this collection is `Aneaire/higantic-skills`. The commands below install agent skills through the `skills` CLI; they do not install or require the separate `@higantic/cli` application.
 
 Install only the HTML Artifacts skill into the current project:
 
@@ -46,6 +56,12 @@ Install all skills globally:
 npx skills add Aneaire/higantic-skills --all --global
 ```
 
+Install the official CLI independently from all capability skills:
+
+```bash
+npm install --global @higantic/cli
+```
+
 You can review available skills before installation with:
 
 ```bash
@@ -55,7 +71,7 @@ npx skills add Aneaire/higantic-skills --list
 ## Prerequisites
 
 - Node.js with `npx` available for installation through skills.sh.
-- Python 3.9 or newer to run `higantic-html-artifacts`.
+- Python 3.9 or newer to run the HiGantic CLI and public Python skills.
 - Network access from the coding agent to your HiGantic agent server.
 - A HiGantic agent ID and a scoped agent API key.
 
@@ -63,23 +79,23 @@ The skill has no third-party Python dependencies.
 
 ## Credentials, profiles, and scopes
 
-For interactive use, place the skill's scripts directory on `PATH` and use browser-approved profile login:
+For interactive use, install the official CLI and use browser-approved profile login:
 
 ```bash
-export PATH="$PWD/skills/higantic-html-artifacts/scripts:$PATH"
+npm install --global @higantic/cli
 higantic auth login
 higantic auth status
 ```
 
-On Windows PowerShell, add the same scripts directory to the current session and use the included `.cmd` launcher:
+The same npm command works in Windows PowerShell:
 
 ```powershell
-$env:Path = "$PWD\skills\higantic-html-artifacts\scripts;$env:Path"
+npm install --global @higantic/cli
 higantic auth login
 higantic auth status
 ```
 
-The literal command is `higantic auth login` when that directory is on `PATH`; no package publication or global Python installation is required. Login shows a ten-minute code and URL, reports that it is waiting and when the approval expires, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
+The npm package exposes the `higantic` command and bundles the dependency-free Python application; Python 3.9+ remains a runtime requirement. The CLI installation is independent of the optional HTML Artifacts and Excalidraw skills. Login shows a ten-minute code and URL, reports that it is waiting and when the approval expires, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
 
 - macOS Keychain through the Security framework.
 - Windows Credential Manager.
@@ -93,7 +109,7 @@ Review the installed catalog again at any time:
 higantic skills install
 ```
 
-The command prints a short English summary by default. Use `higantic skills install --json` when a script needs the structured result. Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. Failed child processes surface only a bounded, control-free final reason. The current public catalog contains `higantic-html-artifacts`, so an installation that already includes this CLI reports it as installed until more public HiGantic skills are released.
+The command prints a short English summary by default. Use `higantic skills install --json` when a script needs the structured result. Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. Failed child processes surface only a bounded, control-free final reason. The public skill catalog contains HTML Artifacts and Excalidraw; it does not install or update the CLI application.
 
 Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
 
@@ -184,8 +200,11 @@ Run the complete local validation suite from the repository root:
 ```bash
 node scripts/build-site.mjs
 node scripts/test-site.mjs
+npm --prefix cli test
+npm pack ./cli --dry-run
 python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
-python3 -m py_compile skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/higantic-html-artifacts/*.py
+python3 -m unittest discover -s tests/cli -p 'test_*.py'
+python3 -m py_compile cli/higantic_cli/*.py skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/cli/*.py tests/higantic-html-artifacts/*.py
 python3 -m json.tool site/v1/manifest.source.json >/dev/null
 python3 -m json.tool site/v1/references/higantic-html-artifacts.json >/dev/null
 python3 -m json.tool skills/higantic-html-artifacts/references/live-reference.json >/dev/null

@@ -22,10 +22,10 @@ Network or validation failure renders `references/live-reference-fallback.json` 
 
 ## Authenticate with a profile
 
-For interactive use, place this skill's `scripts/` directory on `PATH` and run:
+For interactive use, install the standalone CLI application separately:
 
 ```bash
-export PATH="$PWD/scripts:$PATH"
+npm install --global @higantic/cli
 higantic auth login
 higantic auth status
 ```
@@ -33,7 +33,7 @@ higantic auth status
 Windows PowerShell uses the included `higantic.cmd` launcher:
 
 ```powershell
-$env:Path = "$PWD\scripts;$env:Path"
+npm install --global @higantic/cli
 higantic auth login
 higantic auth status
 ```
@@ -104,7 +104,7 @@ Never place a key in a repository, prompt, CLI argument, shell history, command 
 
 Run `higantic --help` or `python3 scripts/higantic_html.py --help`. The launchers and modules support Python 3.9+ with no third-party dependencies.
 
-The same launcher also exposes first-class Canvas commands under `higantic canvas`; install the `higantic-excalidraw` skill for the diagram-design workflow and scene contract.
+The HTML skill retains a compatibility copy of the launcher for existing installations. New setups should use the standalone `@higantic/cli` npm application. That application also exposes first-class Canvas commands under `higantic canvas`; install the `higantic-excalidraw` skill separately for the diagram-design workflow and scene contract.
 
 ## References
 

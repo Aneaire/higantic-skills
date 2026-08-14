@@ -31,7 +31,7 @@ Keep the released source reference and bundled fallback identical. Bump `minimum
 3. Add or update tests for executable behavior.
 4. Record user-visible changes in [CHANGELOG.md](CHANGELOG.md).
 5. Use repo-relative paths in examples and provenance guidance.
-6. Do not claim a package or integration is published unless it is publicly available. Installation from this repository uses `npx skills add`.
+6. Do not claim a package or integration is published unless it is publicly available. Agent skills use `npx skills add`; the standalone CLI uses the `@higantic/cli` npm package after its release gate passes.
 
 ## Validation
 
@@ -40,8 +40,11 @@ Run from the repository root:
 ```bash
 node scripts/build-site.mjs
 node scripts/test-site.mjs
+npm --prefix cli test
+npm pack ./cli --dry-run
 python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
-python3 -m py_compile skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/higantic-html-artifacts/*.py
+python3 -m unittest discover -s tests/cli -p 'test_*.py'
+python3 -m py_compile cli/higantic_cli/*.py skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/cli/*.py tests/higantic-html-artifacts/*.py
 python3 -m json.tool site/v1/manifest.source.json >/dev/null
 python3 -m json.tool site/v1/references/higantic-html-artifacts.json >/dev/null
 python3 -m json.tool skills/higantic-html-artifacts/references/live-reference.json >/dev/null

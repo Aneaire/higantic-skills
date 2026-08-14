@@ -47,10 +47,20 @@ jobs:
           python3 -m json.tool evals/higantic-html-artifacts/evals.json >/dev/null
 
       - name: Run all Python tests
-        run: python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
+        run: |
+          python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
+          python3 -m unittest discover -s tests/cli -p 'test_*.py'
+
+      - name: Pack and install standalone npm CLI
+        run: |
+          npm --prefix cli test
+          package_file=$(npm pack ./cli --ignore-scripts --pack-destination /tmp --silent)
+          npm install --global "/tmp/$package_file"
+          higantic --version
+          higantic doctor --offline --json
 
       - name: Compile all Python files
-        run: python3 -m py_compile skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/higantic-html-artifacts/*.py
+        run: python3 -m py_compile cli/higantic_cli/*.py skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/cli/*.py tests/higantic-html-artifacts/*.py
 
       - name: Validate repository structure
         run: python3 scripts/validate_repository.py

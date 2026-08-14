@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added the standalone `@higantic/cli` npm application with its own `higantic` command, installed independently from HTML Artifacts and Excalidraw agent skills; the bundled Python runtime still requires Python 3.9+, and the HTML skill retains a compatibility launcher for existing users.
 - Added English-by-default auth results with explicit `--json`, non-secret `auth profiles`, read-only `doctor` diagnostics, `--version`, device-approval progress, contextual recovery hints, and bounded control-free child-installer failure details.
 - Replaced the terse existing-profile login error with actionable commands to inspect the profile, safely revoke and sign in again, or create another named profile.
 - Changed `higantic skills install` to print a concise English summary by default while preserving structured automation output through `--json`.

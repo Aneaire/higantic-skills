@@ -1,0 +1,7 @@
+higantic_cli/__pycache__
+higantic_cli/**/*.pyc
+higantic_cli/**/*.pyo
+build/
+dist/
+*.egg-info/
+tests/
