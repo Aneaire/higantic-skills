@@ -16,9 +16,10 @@ The `@higantic/cli` npm application is separate from agent skills:
 
 ```bash
 npm install --global @higantic/cli
+higantic setup
 ```
 
-This creates the `higantic` command without installing HTML Artifacts or Excalidraw agent instructions.
+The npm command creates `higantic` without silently installing agent instructions. `higantic setup` confirms that the CLI is ready, then offers HTML Artifacts and Excalidraw separately with `[Y/n]` prompts; pressing Enter accepts each skill.
 
 ## Branded live references
 
@@ -60,6 +61,7 @@ Install the official CLI independently from all capability skills:
 
 ```bash
 npm install --global @higantic/cli
+higantic setup
 ```
 
 You can review available skills before installation with:
@@ -83,6 +85,7 @@ For interactive use, install the official CLI and use browser-approved profile l
 
 ```bash
 npm install --global @higantic/cli
+higantic setup
 higantic auth login
 higantic auth status
 ```
@@ -91,6 +94,7 @@ The same npm command works in Windows PowerShell:
 
 ```powershell
 npm install --global @higantic/cli
+higantic setup
 higantic auth login
 higantic auth status
 ```
@@ -109,7 +113,7 @@ Review the installed catalog again at any time:
 higantic skills install
 ```
 
-The command prints a short English summary by default. Use `higantic skills install --json` when a script needs the structured result. Use `higantic skills install --yes` only when you deliberately want to install every missing offered skill noninteractively. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is actually selected for installation. Failed child processes surface only a bounded, control-free final reason. The public skill catalog contains HTML Artifacts and Excalidraw; it does not install or update the CLI application.
+`higantic setup` confirms the CLI installation and reviews every missing public skill. Each interactive prompt uses `[Y/n]`, so Enter installs that skill; an explicit `n` skips it. The same catalog is available through `higantic skills install`, and `--yes` deliberately installs every missing offered skill noninteractively. Use `higantic skills install --json` when a script needs the structured result. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is selected. Failed child processes surface only a bounded, control-free final reason. The catalog contains HTML Artifacts and Excalidraw; it does not install or update the CLI application.
 
 Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
 

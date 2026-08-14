@@ -97,7 +97,7 @@ def _ask_yes_no(question: str) -> bool:
     answer = sys.stdin.readline()
     if answer == "":
         return False
-    return answer.strip().lower() in {"y", "yes"}
+    return answer.strip().lower() in {"", "y", "yes"}
 
 
 def _npx_executable() -> str:
@@ -195,7 +195,7 @@ def install_skills(selected: Optional[Sequence[str]] = None, assume_yes: bool = 
     for entry in pending:
         if not assume_yes:
             print(f"\n{entry['name']}\n  {entry['description']}", file=sys.stderr)
-            if not _ask_yes_no(f"Install {entry['name']} globally? [y/N]"):
+            if not _ask_yes_no(f"Install {entry['name']} globally? [Y/n]"):
                 result["declined"].append(entry["slug"])
                 continue
         try:
@@ -249,6 +249,4 @@ def format_install_result(result: Dict[str, Any]) -> str:
 def offer_skills_after_login(disabled: bool = False) -> Optional[Dict[str, Any]]:
     if disabled or not _interactive_terminal() or not missing_skills():
         return None
-    if not _ask_yes_no("Would you like to review optional HiGantic skills now? [y/N]"):
-        return {"declinedCatalog": True}
     return install_skills()

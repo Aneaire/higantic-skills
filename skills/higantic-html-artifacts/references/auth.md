@@ -11,6 +11,7 @@ higantic auth profiles          # lists non-secret profile metadata, marks activ
 higantic doctor                 # read-only CLI, credential, storage, and API checks
 higantic doctor --offline       # same, skipping the authenticated API check
 higantic --version              # confirms the CLI is installed and runnable
+higantic setup                  # confirms success and offers every public skill
 ```
 
 Interpretation:
@@ -67,7 +68,7 @@ Grant only the scopes needed:
 - `excalidraw_pages:create` when Canvas page creation is required
 - `html_artifacts:share` only for deliberate stable publication or pinned capability links
 
-Existing keys may report legacy `html_assets:*` grants; the server keeps those grants compatible on asset routes, while CLI 1.8.0 requests canonical `assets:*` scopes.
+Existing keys may report legacy `html_assets:*` grants; the server keeps those grants compatible on asset routes, while CLI 1.8.0 and later request canonical `assets:*` scopes.
 
 ## Common errors
 

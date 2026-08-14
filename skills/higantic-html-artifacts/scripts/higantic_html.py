@@ -557,6 +557,13 @@ def build_parser() -> argparse.ArgumentParser:
     profiles = auth_commands.add_parser("profiles", description="List configured profile metadata without reading or printing API keys.")
     profiles.add_argument("--json", action="store_true")
 
+    setup = groups.add_parser(
+        "setup",
+        help="Confirm the CLI installation and install public skills.",
+        description="Confirm that the HiGantic CLI is ready, then review every missing public skill.",
+    )
+    setup.add_argument("--yes", action="store_true", help="Install every missing public skill without prompting.")
+
     doctor = groups.add_parser("doctor", help="Check CLI health and connectivity.", description="Run read-only CLI, credential, dependency, and API diagnostics.")
     doctor.add_argument("--profile", default=argparse.SUPPRESS)
     doctor.add_argument("--offline", action="store_true", help="Skip the authenticated API connectivity check.")
@@ -1068,6 +1075,18 @@ def error_hint(code: str) -> Optional[str]:
 def main() -> int:
     try:
         args = build_parser().parse_args()
+        if args.group == "setup":
+            print(
+                "\n".join([
+                    status_line(f"HiGantic CLI {CLI_VERSION} installed successfully", "green"),
+                    *detail_lines([("Command", "higantic"), ("Public skills", len(SKILL_CATALOG))]),
+                    "\nReview the available agent skills:",
+                ]),
+                flush=True,
+            )
+            result = install_skills(assume_yes=args.yes)
+            print(format_install_result(safe_output(result)))
+            return 2 if result["failed"] else 0
         if args.group == "doctor":
             result = run_doctor(args.profile, args.allow_protected_file, args.offline)
             printable = safe_output(result)

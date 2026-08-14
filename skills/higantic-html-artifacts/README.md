@@ -26,6 +26,7 @@ For interactive use, install the standalone CLI application separately:
 
 ```bash
 npm install --global @higantic/cli
+higantic setup
 higantic auth login
 higantic auth status
 ```
@@ -34,13 +35,14 @@ Windows PowerShell uses the included `higantic.cmd` launcher:
 
 ```powershell
 npm install --global @higantic/cli
+higantic setup
 higantic auth login
 higantic auth status
 ```
 
 `higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` and `assets:share` scopes are requested only with explicit repeated `--scope` flags and are never preselected in the browser.
 
-After successful interactive login, the CLI offers to review missing public HiGantic skills. The catalog is optional, every missing skill has a separate yes/no prompt, installed skills are skipped, and optional installation cannot turn a successful authentication into a failure. Redirected or noninteractive login never prompts; use `auth login --no-skill-offer` to suppress the offer explicitly. Run `higantic skills install` to revisit the catalog or `higantic skills install --yes` for deliberate noninteractive installation of every missing offered skill. The command prints English by default; pass `--json` when a script needs its structured result. The fixed skills.sh child process receives no HiGantic credential or custom-origin environment variables, and failed processes expose only a bounded, control-free final reason.
+Run `higantic setup` immediately after installing the CLI to get a clear success confirmation and review every public skill. Each missing skill has a separate `[Y/n]` prompt, so Enter installs it; installed skills are skipped. Successful interactive login offers the same missing catalog, while optional installation cannot turn successful authentication into a failure. Redirected or noninteractive login never prompts; use `auth login --no-skill-offer` to suppress the offer explicitly. Run `higantic skills install` to revisit the catalog or use `higantic setup --yes` for deliberate noninteractive installation of every missing offered skill. The command prints English by default; pass `--json` to `skills install` when a script needs the structured result. The fixed skills.sh child process receives no HiGantic credential or custom-origin environment variables, and failed processes expose only a bounded, control-free final reason.
 
 Issued keys are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service through a validated `secret-tool` executable. Profile metadata contains no key and is stored at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
 
@@ -71,6 +73,7 @@ higantic auth import --stdin         # exactly one key line, remotely validated
 higantic doctor                      # read-only setup and connectivity checks
 higantic doctor --offline            # skip the remote API check
 higantic --version
+higantic setup                       # confirm the CLI and review all public skills
 higantic skills install              # review missing public skills one by one
 higantic skills install --json       # machine-readable installation result
 ```

@@ -15,7 +15,7 @@ from higantic_cli import higantic_html
 
 class PackageTests(unittest.TestCase):
     def test_package_version_matches_cli_version(self):
-        self.assertEqual(higantic_cli.__version__, "1.8.0")
+        self.assertEqual(higantic_cli.__version__, "1.8.1")
         parser = higantic_html.build_parser()
         self.assertEqual(parser.prog, "higantic")
 
@@ -28,7 +28,7 @@ class PackageTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(completed.returncode, 0)
-        self.assertEqual(completed.stdout.strip(), "HiGantic CLI 1.8.0")
+        self.assertEqual(completed.stdout.strip(), "HiGantic CLI 1.8.1")
 
     def test_packaged_modules_match_the_compatibility_launcher(self):
         compatibility_scripts = ROOT / "skills" / "higantic-html-artifacts" / "scripts"

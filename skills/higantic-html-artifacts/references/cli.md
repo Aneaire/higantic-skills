@@ -12,6 +12,7 @@ Both accept the same commands and flags. `higantic --version` and `higantic --he
 ```bash
 higantic auth ...                # login, status, use, logout, import, profiles
 higantic doctor                  # read-only CLI, credential, storage, and API checks
+higantic setup                   # confirm the CLI and review every public skill
 higantic skills install          # review and install optional public skills
 higantic pages list              # list HTML pages
 higantic pages create            # create an HTML page

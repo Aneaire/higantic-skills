@@ -50,6 +50,15 @@ class ParserTests(unittest.TestCase):
 
 
 class CatalogAndConsentTests(unittest.TestCase):
+    def test_yes_no_prompt_defaults_to_yes_on_enter(self):
+        with mock.patch.object(INSTALLER.sys, "stdin", io.StringIO("\n")):
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertTrue(INSTALLER._ask_yes_no("Install? [Y/n]"))
+
+        with mock.patch.object(INSTALLER.sys, "stdin", io.StringIO("n\n")):
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertFalse(INSTALLER._ask_yes_no("Install? [Y/n]"))
+
     def test_installed_skills_are_skipped_without_invoking_npx(self):
         with mock.patch.object(INSTALLER, "SKILL_CATALOG", FIXTURE_CATALOG):
             with mock.patch.object(INSTALLER, "_skill_is_installed", return_value=True):
@@ -80,19 +89,19 @@ class CatalogAndConsentTests(unittest.TestCase):
         self.assertEqual(result["installed"], ["higantic-html-artifacts"])
         self.assertEqual(result["declined"], ["higantic-research"])
 
-    def test_post_login_offer_is_silent_without_missing_skills_and_has_a_catalog_gate(self):
+    def test_post_login_offer_is_silent_without_missing_skills_and_reviews_each_missing_skill(self):
         with mock.patch.object(INSTALLER, "_interactive_terminal", return_value=True):
             with mock.patch.object(INSTALLER, "missing_skills", return_value=[]):
-                with mock.patch.object(INSTALLER, "_ask_yes_no") as ask:
+                with mock.patch.object(INSTALLER, "install_skills") as install:
                     self.assertIsNone(INSTALLER.offer_skills_after_login())
-                    ask.assert_not_called()
+                    install.assert_not_called()
 
         with mock.patch.object(INSTALLER, "_interactive_terminal", return_value=True):
             with mock.patch.object(INSTALLER, "missing_skills", return_value=[FIXTURE_CATALOG[1]]):
-                with mock.patch.object(INSTALLER, "_ask_yes_no", return_value=False) as ask:
+                with mock.patch.object(INSTALLER, "install_skills", return_value={"installed": []}) as install:
                     result = INSTALLER.offer_skills_after_login()
-        self.assertEqual(result, {"declinedCatalog": True})
-        ask.assert_called_once()
+        self.assertEqual(result, {"installed": []})
+        install.assert_called_once_with()
 
 
 class ProcessSafetyTests(unittest.TestCase):
@@ -144,6 +153,39 @@ class ProcessSafetyTests(unittest.TestCase):
 
 
 class MainFlowTests(unittest.TestCase):
+    def test_setup_confirms_cli_and_reviews_every_public_skill(self):
+        result = {
+            "scope": "global",
+            "installed": ["higantic-html-artifacts", "higantic-excalidraw"],
+            "alreadyInstalled": [],
+            "declined": [],
+            "failed": [],
+        }
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["higantic", "setup"]):
+            with mock.patch.object(HTML, "install_skills", return_value=result) as install:
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(HTML.main(), 0)
+        output = stdout.getvalue()
+        self.assertIn("installed successfully", output)
+        self.assertIn("Public skills  2", output)
+        self.assertIn("HTML Artifacts, Excalidraw Canvas", output)
+        install.assert_called_once_with(assume_yes=False)
+
+    def test_setup_yes_is_noninteractive(self):
+        result = {
+            "scope": "global",
+            "installed": [],
+            "alreadyInstalled": ["higantic-html-artifacts", "higantic-excalidraw"],
+            "declined": [],
+            "failed": [],
+        }
+        with mock.patch.object(sys, "argv", ["higantic", "setup", "--yes"]):
+            with mock.patch.object(HTML, "install_skills", return_value=result) as install:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(HTML.main(), 0)
+        install.assert_called_once_with(assume_yes=True)
+
     def test_existing_profile_error_explains_safe_next_steps(self):
         stderr = io.StringIO()
         error = HTML.AuthError(

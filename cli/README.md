@@ -8,7 +8,15 @@ Install it independently from the public capability skills:
 npm install --global @higantic/cli
 ```
 
-Verify the installation before signing in:
+Confirm the installation and review every public HiGantic skill:
+
+```bash
+higantic setup
+```
+
+Each missing skill has its own `[Y/n]` prompt; pressing Enter installs it. For a deliberate noninteractive installation of every missing skill, run `higantic setup --yes`.
+
+Check the version and local diagnostics at any time:
 
 ```bash
 higantic --version
@@ -22,4 +30,4 @@ higantic auth login
 higantic auth status
 ```
 
-The npm package exposes the `higantic` command and bundles the dependency-free Python application. Node.js and Python 3.9+ are required. Install the HTML Artifacts and Excalidraw agent skills separately with their documented `npx skills add` commands.
+The npm package exposes the `higantic` command and bundles the dependency-free Python application. Node.js and Python 3.9+ are required. HTML Artifacts and Excalidraw remain separate agent-skill installations even when `higantic setup` offers both together.

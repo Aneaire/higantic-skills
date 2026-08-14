@@ -24,6 +24,16 @@ test("launcher exposes the packaged CLI", () => {
   assert.equal(output.trim(), `HiGantic CLI ${PACKAGE.version}`);
 });
 
+test("launcher exposes the setup onboarding command", () => {
+  const output = execFileSync(
+    process.execPath,
+    [resolve(ROOT, "bin", "higantic.js"), "setup", "--help"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  assert.match(output, /Confirm that the HiGantic CLI is ready/);
+  assert.match(output, /--yes/);
+});
+
 test("launcher preserves CLI exit codes", () => {
   const result = spawnSync(
     process.execPath,
