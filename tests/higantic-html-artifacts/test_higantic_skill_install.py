@@ -194,7 +194,7 @@ class MainFlowTests(unittest.TestCase):
                     self.assertEqual(HTML.main(), 0)
         output = stdout.getvalue()
         self.assertIn("HiGantic setup", output)
-        self.assertIn("CLI 1.8.2 ready", output)
+        self.assertIn("CLI 1.8.3 ready", output)
         self.assertIn("Public skills  3", output)
         self.assertIn("Enter installs · n skips", output)
         self.assertIn("Skill setup complete", output)

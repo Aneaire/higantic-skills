@@ -14,7 +14,7 @@ The interactive display uses a compact setup panel and a numbered rail so it is 
 
 ```text
 ╭─ HiGantic setup
-│  ✓ CLI 1.8.2 ready
+│  ✓ CLI 1.8.3 ready
 │
 │  Command        higantic
 │  Public skills  3

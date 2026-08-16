@@ -1,6 +1,6 @@
 {
   "name": "@higantic/cli",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "description": "Official command-line interface for HiGantic authentication, diagnostics, HTML Artifacts, managed images, and Canvas diagrams.",
   "type": "module",
   "bin": {

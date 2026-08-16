@@ -1129,6 +1129,9 @@ def main() -> int:
         if args.group == "visibility" and args.command == "set" and args.visibility == "public":
             print("Warning: the stable public URL is accessible to anyone and follows the artifact's current revision until visibility is set to private.", file=sys.stderr)
         return 0
+    except KeyboardInterrupt:
+        print(f"\n{status_line('Cancelled', 'amber', sys.stderr)}", file=sys.stderr)
+        return 130
     except (ApiError, AuthError, SkillInstallError) as error:
         if isinstance(error, AuthError) and error.code == "profile_exists" and isinstance(error.details, dict):
             profile = str(error.details.get("profile", ""))
