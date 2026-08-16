@@ -37,7 +37,6 @@ CAPABILITY_TEXT = {
     "html-pages": "List existing HTML Artifact pages and create a page when required.",
     "html-artifacts": "List, create, look up, upsert, read, update, and deliberately delete artifacts.",
     "html-revisions": "List, read, append, and restore immutable artifact revisions.",
-    "managed-assets": "List, inspect, upload, deliberately publish or privatize, delete, and choose storage targets for managed image assets.",
     "private-artifact-urls": "Produce private workspace URLs for artifacts and revisions.",
     "stable-public-visibility": "Read and explicitly change stable public visibility for current-revision artifact URLs.",
     "capability-shares": "List, create, revoke, and rotate explicit pinned capability shares when server support is enabled.",
@@ -45,13 +44,6 @@ CAPABILITY_TEXT = {
 COMMAND_TEXT = {
     "pages.list": "pages list",
     "pages.create": "pages create",
-    "assets.list": "assets list",
-    "assets.show": "assets show",
-    "assets.upload": "assets upload",
-    "assets.delete": "assets delete",
-    "assets.targets": "assets targets list/status/use",
-    "assets.make_public": "assets make-public",
-    "assets.make_private": "assets make-private",
     "artifacts.list": "artifacts list",
     "artifacts.create": "artifacts create",
     "artifacts.lookup": "artifacts lookup",
@@ -75,9 +67,6 @@ SCOPE_TEXT = {
     "html_artifacts:read": "read artifacts and revisions",
     "html_artifacts:write": "create and modify artifacts and revisions",
     "html_artifacts:share": "publish stable URLs and manage pinned capability links",
-    "assets:read": "list managed assets",
-    "assets:write": "upload and delete managed assets",
-    "assets:share": "publish images and authorize deletion of public images",
     "html_pages:create": "create HTML Artifact pages",
 }
 FEATURE_TEXT = {
@@ -92,7 +81,6 @@ FEATURE_TEXT = {
 }
 LIMIT_TEXT = {
     "artifactSourceBytes": "Maximum artifact source bytes",
-    "assetUploadBytes": "Maximum managed asset upload bytes",
     "revisionsPerArtifact": "Maximum revisions per artifact",
     "requestsPerMinutePerKey": "Maximum requests per minute per key",
     "writesPerMinutePerKey": "Maximum writes per minute per key",

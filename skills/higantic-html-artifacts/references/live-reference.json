@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "higantic-html-artifacts",
-  "installedVersion": "1.8.1",
+  "installedVersion": "1.8.2",
   "manifestUrl": "https://skills.higantic.com/v1/manifest.json",
   "referenceUrl": "https://skills.higantic.com/v1/references/higantic-html-artifacts.json"
 }

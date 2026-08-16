@@ -18,6 +18,7 @@ SKILL_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 INSTALL_TIMEOUT_SECONDS = 300
 INSTALLER_MESSAGE_LIMIT = 240
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+ANSI_STYLES = {"bold": "1", "dim": "2", "red": "31", "green": "32", "amber": "33", "cyan": "36"}
 SENSITIVE_CHILD_ENVIRONMENT = {
     "HIGANTIC_AGENT_ID",
     "HIGANTIC_API_BASE_URL",
@@ -33,6 +34,11 @@ SKILL_CATALOG = (
         "slug": "higantic-html-artifacts",
         "name": "HTML Artifacts",
         "description": "Create and maintain safe, versioned HTML artifacts in HiGantic.",
+    },
+    {
+        "slug": "higantic-assets",
+        "name": "Managed Assets",
+        "description": "Upload, organize, and deliberately share managed images in HiGantic.",
     },
     {
         "slug": "higantic-excalidraw",
@@ -90,6 +96,32 @@ def missing_skills(selected: Optional[Sequence[str]] = None) -> List[Dict[str, s
 
 def _interactive_terminal() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
+
+def _color_enabled(stream) -> bool:
+    return (
+        os.environ.get("NO_COLOR") is None
+        and os.environ.get("TERM", "").lower() != "dumb"
+        and bool(getattr(stream, "isatty", lambda: False)())
+    )
+
+
+def _paint(value: str, *styles: str, stream=None) -> str:
+    target = sys.stderr if stream is None else stream
+    if not styles or not _color_enabled(target):
+        return value
+    codes = ";".join(ANSI_STYLES[style] for style in styles)
+    return f"\033[{codes}m{value}\033[0m"
+
+
+def _glyph(value: str, fallback: str, stream=None) -> str:
+    target = sys.stderr if stream is None else stream
+    encoding = getattr(target, "encoding", None) or "utf-8"
+    try:
+        value.encode(encoding)
+        return value
+    except (LookupError, UnicodeEncodeError):
+        return fallback
 
 
 def _ask_yes_no(question: str) -> bool:
@@ -192,19 +224,23 @@ def install_skills(selected: Optional[Sequence[str]] = None, assume_yes: bool = 
             "interactive_required",
             "Run this command in an interactive terminal or pass --yes to install every missing offered skill.",
         )
-    for entry in pending:
+    for index, entry in enumerate(pending, start=1):
+        step = _paint(f"{index:02d}/{len(pending):02d}", "cyan", "bold", stream=sys.stderr)
+        print(f"\n{step}  {_paint(entry['name'], 'bold', stream=sys.stderr)}", file=sys.stderr)
+        print(f"       {_paint(entry['description'], 'dim', stream=sys.stderr)}", file=sys.stderr)
         if not assume_yes:
-            print(f"\n{entry['name']}\n  {entry['description']}", file=sys.stderr)
-            if not _ask_yes_no(f"Install {entry['name']} globally? [Y/n]"):
+            if not _ask_yes_no("       Install globally? [Y/n]"):
                 result["declined"].append(entry["slug"])
+                print(f"       {_paint(_glyph('—', '-', sys.stderr) + ' Skipped', 'amber', stream=sys.stderr)}", file=sys.stderr)
                 continue
         try:
             _install(entry)
             result["installed"].append(entry["slug"])
-            print(f"Installed {entry['name']} globally.", file=sys.stderr)
+            print(f"       {_paint(_glyph('✓', 'OK', sys.stderr) + ' Installed globally', 'green', 'bold', stream=sys.stderr)}", file=sys.stderr)
         except SkillInstallError as error:
             result["failed"].append({"slug": entry["slug"], "code": error.code, "message": str(error)})
-            print(f"Could not install {entry['name']}: {error}", file=sys.stderr)
+            print(f"       {_paint(_glyph('✕', 'X', sys.stderr) + ' Installation failed', 'red', 'bold', stream=sys.stderr)}", file=sys.stderr)
+            print(f"       {_paint(str(error), 'dim', stream=sys.stderr)}", file=sys.stderr)
     return result
 
 
@@ -219,16 +255,15 @@ def format_install_result(result: Dict[str, Any]) -> str:
     declined = [display_name(slug) for slug in result.get("declined", [])]
     failed = result.get("failed", [])
 
-    if len(already_installed) == 1 and not installed and not declined and not failed:
-        return f"{already_installed[0]} is already installed globally."
-
-    lines = ["HiGantic skills installation summary:"]
+    rail = _paint(_glyph("│", "|", sys.stdout), "cyan", stream=sys.stdout)
+    title = "Skill setup finished with issues" if failed else "Skill setup complete"
+    lines = [_paint(f"{_glyph('╭─', '+-', sys.stdout)} {title}", "cyan", "bold", stream=sys.stdout)]
     if installed:
-        lines.append(f"  Installed globally: {', '.join(installed)}")
+        lines.append(f"{rail}  {_paint(_glyph('✓', 'OK', sys.stdout), 'green', 'bold', stream=sys.stdout)} {_paint('Installed', 'dim', stream=sys.stdout)}  {', '.join(installed)}")
     if already_installed:
-        lines.append(f"  Already installed: {', '.join(already_installed)}")
+        lines.append(f"{rail}  {_paint(_glyph('•', '*', sys.stdout), 'cyan', stream=sys.stdout)} {_paint('Ready', 'dim', stream=sys.stdout)}      {', '.join(already_installed)}")
     if declined:
-        lines.append(f"  Skipped: {', '.join(declined)}")
+        lines.append(f"{rail}  {_paint(_glyph('—', '-', sys.stdout), 'amber', stream=sys.stdout)} {_paint('Skipped', 'dim', stream=sys.stdout)}    {', '.join(declined)}")
     if failed:
         failures = []
         for item in failed:
@@ -240,9 +275,10 @@ def format_install_result(result: Dict[str, Any]) -> str:
                 failures.append(f"{label} — {message}")
             else:
                 failures.append(f"{label} ({code})" if code else label)
-        lines.append(f"  Failed: {', '.join(failures)}")
+        lines.append(f"{rail}  {_paint(_glyph('✕', 'X', sys.stdout), 'red', 'bold', stream=sys.stdout)} {_paint('Failed', 'dim', stream=sys.stdout)}     {', '.join(failures)}")
     if len(lines) == 1:
-        lines.append("  No skills needed installation.")
+        lines.append(f"{rail}  {_paint(_glyph('✓', 'OK', sys.stdout), 'green', 'bold', stream=sys.stdout)} All selected skills are ready")
+    lines.append(_paint(_glyph("╰────────────────────────", "+------------------------", sys.stdout), "cyan", stream=sys.stdout))
     return "\n".join(lines)
 
 

@@ -1,11 +1,16 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-14T00:00:00Z",
+  "updatedAt": "2026-08-16T00:00:00Z",
   "references": [
     {
       "slug": "higantic-html-artifacts",
       "path": "references/higantic-html-artifacts.json",
       "minimumInstalledVersion": "1.8.1"
+    },
+    {
+      "slug": "higantic-assets",
+      "path": "references/higantic-assets.json",
+      "minimumInstalledVersion": "1.0.0"
     },
     {
       "slug": "higantic-excalidraw",

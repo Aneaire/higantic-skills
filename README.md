@@ -10,20 +10,27 @@ Creates and maintains safe, versioned, static HTML artifacts when a user explici
 
 The skill retains a compatibility launcher for existing installations. New installations use the standalone dependency-free Python CLI under `cli/`.
 
+### `higantic-assets`
+
+Manages image assets independently from HTML: list, inspect, upload, choose storage targets, publish or privatize standalone viewers, and deliberately delete. HTML Artifacts may embed an existing `higantic-asset://...` reference without owning its lifecycle.
+
+### `higantic-excalidraw`
+
+Creates and maintains editable Excalidraw Canvas diagrams in a HiGantic workspace.
+
 ## Standalone CLI
 
 The `@higantic/cli` npm application is separate from agent skills:
 
 ```bash
-npm install --global @higantic/cli
-higantic setup
+npm install --global @higantic/cli && higantic setup
 ```
 
-The npm command creates `higantic` without silently installing agent instructions. `higantic setup` confirms that the CLI is ready, then offers HTML Artifacts and Excalidraw separately with `[Y/n]` prompts; pressing Enter accepts each skill.
+The npm command creates `higantic` without silently installing agent instructions. `higantic setup` confirms that the CLI is ready, then offers HTML Artifacts, Managed Assets, and Excalidraw separately with `[Y/n]` prompts; pressing Enter accepts each skill.
 
 ## Branded live references
 
-Installed skills can read current product state without accepting mutable remote prose or instructions. The maintained source manifest is `site/v1/manifest.source.json`; the deterministic build publishes `https://skills.higantic.com/v1/manifest.json` and the closed-schema HTML Artifacts reference at `https://skills.higantic.com/v1/references/higantic-html-artifacts.json`.
+Installed skills can read current product state without accepting mutable remote prose or instructions. The maintained source manifest is `site/v1/manifest.source.json`; the deterministic build publishes `https://skills.higantic.com/v1/manifest.json` and one closed-schema reference per skill, including `https://skills.higantic.com/v1/references/higantic-html-artifacts.json` and `https://skills.higantic.com/v1/references/higantic-assets.json`.
 
 Each manifest-declared skill packages `scripts/fetch_live_reference.py`, `references/live-reference.json`, and `references/live-reference-fallback.json`. The canonical local config supplies that skill's installed version and exact URLs. The dependency-free fetcher disables environment proxies, sends no API key, cookies, Authorization header, or environment-derived headers, and validates exact paths, same-origin redirect policy, 64 KiB size limits, duplicate keys, ASCII-only constrained strings, fixed identifier allowlists, booleans, nonnegative integer limits, timestamps, semantic versions, and SHA-256 consistency. Remote bytes are never printed. Trusted installed code renders validated state through fixed local text; failures render the structured bundled fallback through the same renderer.
 
@@ -37,6 +44,12 @@ Install only the HTML Artifacts skill into the current project:
 
 ```bash
 npx skills add Aneaire/higantic-skills --skill higantic-html-artifacts
+```
+
+Install only the Managed Assets skill globally:
+
+```bash
+npx skills add Aneaire/higantic-skills --skill higantic-assets --global
 ```
 
 Install every skill in the collection for every detected agent:
@@ -60,8 +73,7 @@ npx skills add Aneaire/higantic-skills --all --global
 Install the official CLI independently from all capability skills:
 
 ```bash
-npm install --global @higantic/cli
-higantic setup
+npm install --global @higantic/cli && higantic setup
 ```
 
 You can review available skills before installation with:
@@ -84,22 +96,20 @@ The skill has no third-party Python dependencies.
 For interactive use, install the official CLI and use browser-approved profile login:
 
 ```bash
-npm install --global @higantic/cli
-higantic setup
+npm install --global @higantic/cli && higantic setup
 higantic auth login
 higantic auth status
 ```
 
-The same npm command works in Windows PowerShell:
+The PowerShell equivalent also starts setup only after npm succeeds:
 
 ```powershell
-npm install --global @higantic/cli
-higantic setup
+npm install --global @higantic/cli; if ($LASTEXITCODE -eq 0) { higantic setup }
 higantic auth login
 higantic auth status
 ```
 
-The npm package exposes the `higantic` command and bundles the dependency-free Python application; Python 3.9+ remains a runtime requirement. The CLI installation is independent of the optional HTML Artifacts and Excalidraw skills. Login shows a ten-minute code and URL, reports that it is waiting and when the approval expires, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
+The npm package exposes the `higantic` command and bundles the dependency-free Python application; Python 3.9+ remains a runtime requirement. The CLI installation is independent of the optional HTML Artifacts, Managed Assets, and Excalidraw skills. Login shows a ten-minute code and URL, reports that it is waiting and when the approval expires, requires explicit browser approval for one agent and a reviewed scope subset, then stores the issued key in the native OS credential store:
 
 - macOS Keychain through the Security framework.
 - Windows Credential Manager.
@@ -113,7 +123,7 @@ Review the installed catalog again at any time:
 higantic skills install
 ```
 
-`higantic setup` confirms the CLI installation and reviews every missing public skill. Each interactive prompt uses `[Y/n]`, so Enter installs that skill; an explicit `n` skips it. The same catalog is available through `higantic skills install`, and `--yes` deliberately installs every missing offered skill noninteractively. Use `higantic skills install --json` when a script needs the structured result. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is selected. Failed child processes surface only a bounded, control-free final reason. The catalog contains HTML Artifacts and Excalidraw; it does not install or update the CLI application.
+`higantic setup` confirms the CLI installation and reviews every missing public skill. Each interactive prompt uses `[Y/n]`, so Enter installs that skill; an explicit `n` skips it. The same catalog is available through `higantic skills install`, and `--yes` deliberately installs every missing offered skill noninteractively. Use `higantic skills install --json` when a script needs the structured result. The child installer receives none of the `HIGANTIC_*` credential or custom-origin variables. Node.js with `npx` is required only when a missing skill is selected. Failed child processes surface only a bounded, control-free final reason. The catalog contains HTML Artifacts, Managed Assets, and Excalidraw; it does not install or update the CLI application.
 
 Profile metadata contains no secrets and lives at `$XDG_CONFIG_HOME/higantic/config.json` or `~/.config/higantic/config.json` on Linux, `~/Library/Application Support/HiGantic/cli/config.json` on macOS, and `%APPDATA%\HiGantic\cli\config.json` on Windows.
 
@@ -207,14 +217,19 @@ node scripts/test-site.mjs
 npm --prefix cli test
 npm pack ./cli --dry-run
 python3 -m unittest discover -s tests/higantic-html-artifacts -p 'test_*.py'
+python3 -m unittest discover -s tests/higantic-assets -p 'test_*.py'
 python3 -m unittest discover -s tests/cli -p 'test_*.py'
-python3 -m py_compile cli/higantic_cli/*.py skills/higantic-html-artifacts/scripts/*.py scripts/validate_repository.py tests/cli/*.py tests/higantic-html-artifacts/*.py
+python3 -m py_compile cli/higantic_cli/*.py skills/higantic-html-artifacts/scripts/*.py skills/higantic-assets/scripts/*.py scripts/validate_repository.py tests/cli/*.py tests/higantic-html-artifacts/*.py tests/higantic-assets/*.py
 python3 -m json.tool site/v1/manifest.source.json >/dev/null
 python3 -m json.tool site/v1/references/higantic-html-artifacts.json >/dev/null
+python3 -m json.tool site/v1/references/higantic-assets.json >/dev/null
 python3 -m json.tool skills/higantic-html-artifacts/references/live-reference.json >/dev/null
 python3 -m json.tool skills/higantic-html-artifacts/references/live-reference-fallback.json >/dev/null
+python3 -m json.tool skills/higantic-assets/references/live-reference.json >/dev/null
+python3 -m json.tool skills/higantic-assets/references/live-reference-fallback.json >/dev/null
 python3 -m json.tool dist/v1/manifest.json >/dev/null
 python3 -m json.tool dist/v1/references/higantic-html-artifacts.json >/dev/null
+python3 -m json.tool dist/v1/references/higantic-assets.json >/dev/null
 python3 scripts/validate_repository.py
 ```
 

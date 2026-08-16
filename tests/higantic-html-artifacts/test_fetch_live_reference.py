@@ -86,16 +86,16 @@ def encoded_reference(data, *, ensure_ascii=True):
 
 
 class LiveReferenceTests(unittest.TestCase):
-    def test_reference_uses_canonical_managed_asset_scopes(self):
-        self.assertIn("assets:read", REFERENCE_DATA["scopes"])
-        self.assertIn("assets:write", REFERENCE_DATA["scopes"])
-        self.assertIn("assets:share", REFERENCE_DATA["scopes"])
+    def test_reference_excludes_managed_asset_lifecycle_scopes(self):
+        self.assertNotIn("assets:read", REFERENCE_DATA["scopes"])
+        self.assertNotIn("assets:write", REFERENCE_DATA["scopes"])
+        self.assertNotIn("assets:share", REFERENCE_DATA["scopes"])
         self.assertNotIn("html_assets:read", REFERENCE_DATA["scopes"])
         self.assertNotIn("html_assets:write", REFERENCE_DATA["scopes"])
         self.assertNotIn("html_assets:share", REFERENCE_DATA["scopes"])
         rendered = MODULE.render_reference(REFERENCE_DATA)
-        self.assertIn("assets:read", rendered)
-        self.assertIn("assets:share", rendered)
+        self.assertNotIn("assets:read", rendered)
+        self.assertNotIn("assets:share", rendered)
 
     def test_success_fetches_structured_reference_without_credentials(self):
         config = MODULE.load_installed_config()

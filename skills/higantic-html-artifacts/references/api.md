@@ -27,19 +27,11 @@ Scopes:
 - `html_artifacts:read`: list pages/artifacts/revisions and read source.
 - `html_artifacts:write`: create, update, revise, restore, and delete artifacts.
 - `html_artifacts:share`: publish/unpublish stable visibility and list/create/revoke/rotate pinned capability shares; high-trust, non-default scope.
-- `assets:read`: list managed images.
-- `assets:write`: upload and delete managed images.
-- `assets:share`: publish or privatize standalone images and authorize deletion of a public image; high-trust, non-default scope.
 - `html_pages:create`: create HTML Artifact pages.
 - `api:invoke`: invoke legacy user-defined `/api` endpoints; unrelated to artifact access.
 
-Existing issued keys with `html_assets:read`, `html_assets:write`, or `html_assets:share` remain compatible aliases on asset routes. New CLI requests and normative documentation use `assets:*`.
-
 Routes:
 
-- `GET /v1/agents/{agentId}/html-asset-targets`
-- `GET|POST /v1/agents/{agentId}/html-assets`
-- `DELETE /v1/agents/{agentId}/html-assets/{assetId}`
 - `GET|POST /html-pages`
 - `GET|POST /html-pages/{pageId}/artifacts`
 - `GET|PUT /html-pages/{pageId}/artifacts/by-external-id/{externalId}`
@@ -56,7 +48,7 @@ Routes:
 
 `externalId` is an immutable 1–128 character client key unique within one page. Use a stable project/purpose key for deterministic lookup/upsert. Retain returned page and artifact IDs for ID-based commands.
 
-Before constructing any resource path, the CLI validates agent, page, artifact, asset, external, and share identifiers as one safe path segment. Empty values, control characters, literal or recursively percent-decoded `.`/`..`, decoded slash or backslash separators, and excessive recursive encoding fail with `invalid_path_segment` before any request. Colons and ordinary spaces remain supported and are percent-encoded for transport.
+Before constructing any resource path, the CLI validates agent, page, artifact, external, and share identifiers as one safe path segment. Empty values, control characters, literal or recursively percent-decoded `.`/`..`, decoded slash or backslash separators, and excessive recursive encoding fail with `invalid_path_segment` before any request. Colons and ordinary spaces remain supported and are percent-encoded for transport.
 
 Page and artifact create calls may send a 1–255 visible-ASCII `Idempotency-Key`. An exact replay returns the original resource; reuse with different input returns `idempotency_conflict`. Use idempotency only for transport retries. It does not replace stable page selection or artifact `externalId`.
 
@@ -68,9 +60,7 @@ If the artifact is already public, an HTML upsert, revision append, or restore a
 
 Artifact deletion atomically removes the artifact, revisions, capability shares/snapshots, and artifact-targeted idempotency records. Existing capability links then return generic 404. Repeating deletion returns `not_found`.
 
-Managed asset deletion removes the live record. A private image needs write scope; a public image also needs share scope and `X-Confirm-Delete: true`. Its stable viewer stops immediately. Storage bytes remain while a pinned share snapshot references the same object and are removed after the final live/snapshot reference disappears. Direct HTML page deletion is not exposed; delete contained artifacts individually.
-
-The CLI requires `--confirm-delete` for both destructive commands.
+Direct HTML page deletion is not exposed; delete contained artifacts individually. The CLI requires `--confirm-delete` for artifact deletion.
 
 ## Stable public visibility
 
@@ -92,15 +82,9 @@ Capability links are unlisted but accessible to anyone with the link. Create and
 
 Do not share artifacts containing credentials, personal/private data, confidential source, unpublished vulnerabilities, or other sensitive information. Produce a sanitized derivative instead.
 
-## Assets and content
+## Managed image references
 
-`GET /html-asset-targets` returns the storage targets available to the agent. `higantic` is always available; `uploadthing` appears only when the owner has linked a usable UploadThing app credential. This selects an UploadThing app, not a raw S3 bucket. Provider tokens remain server-side.
-
-`GET /html-assets/{assetId}` inspects one same-agent image. `GET|PUT /html-assets/{assetId}/visibility` reads or changes normalized standalone visibility. Publishing requires `assets:share` and `confirmPublicSharing: true`; making private needs no confirmation. Only managed PNG/JPEG/WebP/GIF records with available storage are publishable. The stable `/i/{assetId}` page contains the image fully within the viewport and proxies validated bytes without revealing storage/provider URLs. It is no-store/noindex, and private, deleted, unsupported, or unavailable images return the same generic 404.
-
-Asset upload accepts a binary PNG/JPEG/WebP/GIF body with matching magic bytes, `X-Asset-Name`, an optional `X-Asset-Target: higantic|uploadthing`, and a 10 MiB maximum. Missing target defaults to `higantic` for API compatibility. `GET /html-assets?target=...` filters the list. UploadThing V1 accepts public-read objects only so stable public artifacts and pinned snapshots remain durable without credential-bearing URLs. Use returned `higantic-asset://<assetId>` references, never provider/storage URLs. The service never imports remote images.
-
-Canonical source supports static HTML, inline CSS, safe credential-free HTTPS links, and managed images. Limits: 250 KiB source, 100 revisions/artifact, 120 requests/minute/key, and 30 writes/minute/key.
+Canonical source supports static HTML, inline CSS, safe credential-free HTTPS links, and existing `higantic-asset://<assetId>` image references. Never embed provider or storage URLs. Use the separate `higantic-assets` skill for image discovery, upload, storage targets, standalone visibility, and deletion. Limits: 250 KiB source, 100 revisions/artifact, 120 requests/minute/key, and 30 writes/minute/key.
 
 Artifact and revision responses include authenticated dedicated-viewer `url` values under `/agents/{agentId}/artifacts/{artifactId}`; revision URLs add `?revision={revision}`. Page responses keep their workspace URLs. Artifact responses also include normalized `visibility` and stable `publicUrl`. Success envelope: `{"data": {...}, "requestId": "..."}`. Error envelope: `{"error":{"code":"...","message":"...","details":...},"requestId":"..."}`. Responses use `Cache-Control: no-store`.
 

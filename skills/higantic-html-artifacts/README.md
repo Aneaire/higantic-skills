@@ -40,7 +40,7 @@ higantic auth login
 higantic auth status
 ```
 
-`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` and `assets:share` scopes are requested only with explicit repeated `--scope` flags and are never preselected in the browser.
+`higantic auth login` preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. The high-trust `html_artifacts:share` scope is requested only with an explicit repeated `--scope` flag and is never preselected in the browser.
 
 Run `higantic setup` immediately after installing the CLI to get a clear success confirmation and review every public skill. Each missing skill has a separate `[Y/n]` prompt, so Enter installs it; installed skills are skipped. Successful interactive login offers the same missing catalog, while optional installation cannot turn successful authentication into a failure. Redirected or noninteractive login never prompts; use `auth login --no-skill-offer` to suppress the offer explicitly. Run `higantic skills install` to revisit the catalog or use `higantic setup --yes` for deliberate noninteractive installation of every missing offered skill. The command prints English by default; pass `--json` to `skills install` when a script needs the structured result. The fixed skills.sh child process receives no HiGantic credential or custom-origin environment variables, and failed processes expose only a bounded, control-free final reason.
 
@@ -49,8 +49,6 @@ Issued keys are stored in macOS Keychain, Windows Credential Manager, or Linux S
 When login finds an existing profile, the CLI explains how to inspect it, revoke and replace its API key safely, or keep it and create another named profile. It never silently overwrites an existing credential.
 
 Authentication commands use concise English output by default. Pass `--json` to any auth command for scripts; JSON login suppresses the optional skill catalog. `higantic auth profiles` lists non-secret metadata and marks the active profile without reading stored keys. `higantic doctor` runs read-only configuration, credential, dependency, and authenticated API checks; `--offline` skips the network check, and `--json` returns the structured report. `higantic --version` prints the installed CLI version.
-
-Managed image uploads use HiGantic storage by default. `higantic assets targets list` discovers whether a linked UploadThing app is available, `assets targets use higantic|uploadthing` stores a non-secret per-profile default, and `assets upload --target ...` overrides it once. UploadThing is selected as an app-backed storage target, not as a raw S3 bucket.
 
 Secure-storage failure is terminal. Protected-file storage is never selected automatically:
 
@@ -93,21 +91,17 @@ If any member of the environment triple is set, all are required. A complete tri
 Grant only the scopes needed:
 
 - `html_artifacts:read` and `html_artifacts:write`
-- `assets:read` and `assets:write`
-- `assets:share` only for deliberate image publication or deletion of a public image
 - `html_pages:create` when page creation is required
 - `excalidraw:read` and `excalidraw:write`
 - `excalidraw:share` only for explicit stable Canvas publishing
 - `excalidraw_pages:create` when Canvas page creation is required
 - `html_artifacts:share` only for deliberate stable publication or pinned capability links
 
-Existing issued keys may still display legacy `html_assets:*` grants. The server accepts them as compatibility aliases on asset routes; new CLI requests use `assets:*`.
-
 Never place a key in a repository, prompt, CLI argument, shell history, command transcript, or committed environment file. The CLI registers environment, profile, imported, and issued keys for process-local redaction and never prints them. It intentionally has no API-key argument.
 
 Run `higantic --help` or `python3 scripts/higantic_html.py --help`. The launchers and modules support Python 3.9+ with no third-party dependencies.
 
-The HTML skill retains a compatibility copy of the launcher for existing installations. New setups should use the standalone `@higantic/cli` npm application. That application also exposes first-class Canvas commands under `higantic canvas`; install the `higantic-excalidraw` skill separately for the diagram-design workflow and scene contract.
+The HTML skill retains a compatibility copy of the launcher for existing installations. New setups should use the standalone `@higantic/cli` npm application. Install `higantic-assets` for image lifecycle work and `higantic-excalidraw` for the diagram-design workflow and scene contract.
 
 ## References
 
@@ -125,19 +119,13 @@ The HTML skill retains a compatibility copy of the launcher for existing install
 5. On exit code `3`, fetch the latest artifact/repository state and reconcile. Do not overwrite a newer revision or artifact version blindly.
 6. Keep potentially shared artifacts free of secrets, credentials, personal/private data, and unpublished security details.
 
-## Managed assets and deletion
+## Existing managed images and deletion
 
 ```bash
-python3 scripts/higantic_html.py assets list
-python3 scripts/higantic_html.py assets show --asset-id ASSET_ID
-python3 scripts/higantic_html.py assets upload --file ./hero.png
-python3 scripts/higantic_html.py assets make-public --asset-id ASSET_ID --confirm-public-sharing
-python3 scripts/higantic_html.py assets make-private --asset-id ASSET_ID
-python3 scripts/higantic_html.py assets delete --asset-id ASSET_ID --confirm-delete
 python3 scripts/higantic_html.py artifacts delete --page-id PAGE_ID --artifact-id ARTIFACT_ID --confirm-delete
 ```
 
-Use `higantic-asset://<assetId>` as an HTML `<img src>`; never copy temporary storage URLs into artifacts. Managed PNG/JPEG/WebP/GIF images may be explicitly published at a stable full-fit `/i/{assetId}` viewer. The viewer proxies bytes without exposing provider URLs and is no-store/noindex. Making the image private or deleting it invalidates that viewer immediately; pinned artifact snapshots remain independent and may retain referenced bytes until no references exist.
+Use an existing `higantic-asset://<assetId>` as an HTML `<img src>`; never copy temporary storage URLs into artifacts. Use the separate `higantic-assets` skill to find, upload, inspect, publish, privatize, or delete managed images.
 
 ## Opt-in public visibility and pinned links
 

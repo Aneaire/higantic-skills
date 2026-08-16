@@ -1,0 +1,40 @@
+{
+  "skill_name": "higantic-assets",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Upload ./brand/hero.webp to my HiGantic workspace, use my current storage preference, and give me the reference I can use in a page. Do not publish it.",
+      "expected_output": "A safe asset workflow that checks authentication and existing assets, uploads only the validated local image, preserves private visibility, and returns actual metadata plus a higantic-asset reference without inventing a provider URL.",
+      "files": [],
+      "expectations": [
+        "Uses the Managed Assets skill rather than the HTML Artifacts skill.",
+        "Treats upload and publication as separate permissions and leaves the new asset private.",
+        "Uses the profile storage preference unless a one-command target override is requested.",
+        "Returns or promises to return the actual higantic-asset://ASSET_ID from the API response."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Make asset abc123 public so I can review it, then delete it when I am done.",
+      "expected_output": "A guarded sequence that distinguishes public visibility from deletion, requires the proper share scope and explicit confirmation flags, reports that deletion invalidates the standalone viewer, and notes pinned artifact snapshots remain independent.",
+      "files": [],
+      "expectations": [
+        "Requires assets:share and --confirm-public-sharing before publication.",
+        "Does not interpret publication as authorization to delete.",
+        "Requires deliberate deletion and --confirm-delete; public deletion also needs assets:share.",
+        "Explains standalone URL revocation without claiming pinned HTML snapshots are deleted."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Update my HiGantic HTML launch report to use the existing image reference higantic-asset://asset_789 as its hero.",
+      "expected_output": "The HTML Artifacts workflow embeds the existing managed reference directly and does not invoke asset lifecycle operations or claim the Managed Assets skill is needed.",
+      "files": [],
+      "expectations": [
+        "Routes the request to the HTML Artifacts skill because the destination is an HTML artifact.",
+        "Does not list, upload, publish, privatize, or delete an asset.",
+        "Uses the provided higantic-asset://asset_789 reference without converting it to a storage URL."
+      ]
+    }
+  ]
+}

@@ -7,7 +7,6 @@ export const CAPABILITY_IDS = Object.freeze([
   "html-pages",
   "html-artifacts",
   "html-revisions",
-  "managed-assets",
   "private-artifact-urls",
   "stable-public-visibility",
   "capability-shares",
@@ -15,13 +14,6 @@ export const CAPABILITY_IDS = Object.freeze([
 export const COMMAND_IDS = Object.freeze([
   "pages.list",
   "pages.create",
-  "assets.list",
-  "assets.show",
-  "assets.upload",
-  "assets.delete",
-  "assets.targets",
-  "assets.make_public",
-  "assets.make_private",
   "artifacts.list",
   "artifacts.create",
   "artifacts.lookup",
@@ -45,9 +37,6 @@ export const SCOPE_IDS = Object.freeze([
   "html_artifacts:read",
   "html_artifacts:write",
   "html_artifacts:share",
-  "assets:read",
-  "assets:write",
-  "assets:share",
   "html_pages:create",
 ]);
 export const FEATURE_KEYS = Object.freeze([
@@ -62,8 +51,38 @@ export const FEATURE_KEYS = Object.freeze([
 ]);
 export const LIMIT_KEYS = Object.freeze([
   "artifactSourceBytes",
-  "assetUploadBytes",
   "revisionsPerArtifact",
+  "requestsPerMinutePerKey",
+  "writesPerMinutePerKey",
+]);
+const ASSET_CAPABILITY_IDS = Object.freeze([
+  "managed-assets",
+  "asset-storage-targets",
+  "standalone-asset-visibility",
+]);
+const ASSET_COMMAND_IDS = Object.freeze([
+  "assets.list",
+  "assets.show",
+  "assets.upload",
+  "assets.delete",
+  "assets.targets",
+  "assets.make_public",
+  "assets.make_private",
+]);
+const ASSET_SCOPE_IDS = Object.freeze([
+  "assets:read",
+  "assets:write",
+  "assets:share",
+]);
+const ASSET_FEATURE_KEYS = Object.freeze([
+  "assetStorageTargetsSupported",
+  "stablePublicVisibilitySupported",
+  "remoteAssetImportSupported",
+  "publicAssetDeletionRequiresShareScope",
+  "pinnedArtifactSnapshotsIndependent",
+]);
+const ASSET_LIMIT_KEYS = Object.freeze([
+  "assetUploadBytes",
   "requestsPerMinutePerKey",
   "writesPerMinutePerKey",
 ]);
@@ -281,12 +300,14 @@ export function validateReference(reference, expectedSlug, label = "reference") 
   asciiString(reference.slug, SLUG_PATTERN, `${label}.slug`);
   if (reference.slug !== expectedSlug) fail(label, "slug does not match the manifest entry");
   timestamp(reference.updatedAt, `${label}.updatedAt`);
-  const isExcalidraw = expectedSlug === "higantic-excalidraw";
-  const capabilityIds = isExcalidraw ? EXCALIDRAW_CAPABILITY_IDS : CAPABILITY_IDS;
-  const commandIds = isExcalidraw ? EXCALIDRAW_COMMAND_IDS : COMMAND_IDS;
-  const scopeIds = isExcalidraw ? EXCALIDRAW_SCOPE_IDS : SCOPE_IDS;
-  const featureKeys = isExcalidraw ? EXCALIDRAW_FEATURE_KEYS : FEATURE_KEYS;
-  const limitKeys = isExcalidraw ? EXCALIDRAW_LIMIT_KEYS : LIMIT_KEYS;
+  const variants = {
+    "higantic-html-artifacts": [CAPABILITY_IDS, COMMAND_IDS, SCOPE_IDS, FEATURE_KEYS, LIMIT_KEYS],
+    "higantic-assets": [ASSET_CAPABILITY_IDS, ASSET_COMMAND_IDS, ASSET_SCOPE_IDS, ASSET_FEATURE_KEYS, ASSET_LIMIT_KEYS],
+    "higantic-excalidraw": [EXCALIDRAW_CAPABILITY_IDS, EXCALIDRAW_COMMAND_IDS, EXCALIDRAW_SCOPE_IDS, EXCALIDRAW_FEATURE_KEYS, EXCALIDRAW_LIMIT_KEYS],
+  };
+  const variant = variants[expectedSlug];
+  if (!variant) fail(label, `unsupported skill slug ${JSON.stringify(expectedSlug)}`);
+  const [capabilityIds, commandIds, scopeIds, featureKeys, limitKeys] = variant;
   identifierArray(reference.supportedCapabilities, capabilityIds, `${label}.supportedCapabilities`);
   identifierArray(reference.supportedCommands, commandIds, `${label}.supportedCommands`);
   identifierArray(reference.scopes, scopeIds, `${label}.scopes`);

@@ -1,6 +1,6 @@
 ---
 name: higantic-html-artifacts
-description: Create, update, or manage safe, versioned HTML reports in HiGantic. Use this skill only when the user explicitly asks to create, update, or manage a report or HTML artifact in HiGantic; mentions a HiGantic workspace, page, or artifact as the destination; or asks to manage HiGantic revisions, assets, visibility, or pinned shares. Do not trigger for generic reports, visualizations, dashboards, plans, reviews, or comparisons with no HiGantic destination.
+description: Create, update, or manage safe, versioned HTML reports in HiGantic. Use this skill only when the user explicitly asks to create, update, or manage a report or HTML artifact in HiGantic; mentions a HiGantic workspace, page, or artifact as the destination; or asks to manage HiGantic HTML revisions, visibility, or pinned shares. Do not trigger for standalone image upload, storage, visibility, or deletion; use higantic-assets for asset lifecycle work. Do not trigger for generic reports, visualizations, dashboards, plans, reviews, or comparisons with no HiGantic destination.
 compatibility: Python 3.9+ and network access to a HiGantic agent server; no third-party packages.
 license: MIT
 ---
@@ -17,7 +17,7 @@ Create static visual review surfaces in the user's HiGantic workspace. Repositor
 4. Inspect the repository source first. Record repo-relative source paths, branch plus commit/ref, generated/updated date, current status, and decisions represented in the artifact. Do not make the artifact a competing source of truth.
 5. Reuse a retained, valid page ID when the page's stable purpose still matches the work; do not list pages again just to rediscover it. Otherwise run `python3 scripts/higantic_html.py pages list`, reuse the matching page, or create one only when needed with a stable operation-specific idempotency key. Retain the returned page ID.
 6. Give each maintained artifact a stable page-unique `externalId` derived from project and purpose. For a create or update, call `artifacts upsert` directly: the CLI performs its own required lookup/read and sends optimistic revision/version preconditions. Do not run a separate `artifacts lookup` immediately before that upsert. Use `artifacts lookup` only for read-only discovery or when another operation genuinely needs the current identity, then retain returned page/artifact IDs for ID-only operations.
-7. When an image helps, run `assets list` and reuse a relevant managed image, inspect one with `assets show`, or upload a locally created image with `assets upload --file`. HiGantic managed storage is the default. Use `assets targets list/status/use` only when choosing between it and an owner-linked UploadThing app; `assets upload --target` is a one-command override. Embed `higantic-asset://...`; never hotlink storage URLs.
+7. When an image helps, embed an existing `higantic-asset://ASSET_ID` reference; never hotlink a provider or storage URL. If the work requires finding, uploading, inspecting, publishing, privatizing, or deleting an image, use the separate `higantic-assets` skill first and retain its returned managed reference.
 8. Write one complete static document to a local file. Include provenance and a clear status/decision summary. Preflight the exact source against `references/static-html-contract.md`: ensure every CSS custom property used is declared, mobile content remains readable, and no unsupported construct, remote dependency, motion-dependent meaning, or fake interactive control remains. Never include secrets, credentials, personal data, private customer data, unpublished vulnerabilities, or other sensitive material, especially if the artifact might later be shared.
 9. Create/upsert the artifact or append a revision with `--html-file`. The CLI reads current revision/version and visibility first. If the artifact is already public, review the replacement for sensitive data and use `--confirm-public-sharing`; the CLI sends that acknowledgement and the observed artifact version into the write, while the backend atomically requires both plus the non-default share scope before live content can change. Exit code `3` means content, metadata, or visibility changed: read the latest source, compare it with repository truth and the intended update, reconcile deliberately, then retry. Never blindly overwrite.
 10. Inspect the returned revision's `sanitization.removedCount` and `removedKinds`. A zero count means the revision saved cleanly. If anything was removed, replace those constructs with supported static equivalents and make at most one corrected upsert/revision using fresh preconditions. Inspect that result, then stop and report any residual removals truthfully; never loop, imply removed features survived, or describe the unsanitized source as the saved result.
@@ -27,14 +27,12 @@ Create static visual review surfaces in the user's HiGantic workspace. Repositor
 
 - Page identity: reuse a stable page purpose/label and persist its returned page ID; use the same idempotency key only for exact create retries.
 - Artifact identity: use immutable `externalId` for deterministic lookup/upsert. An idempotency key protects one create request; it does not replace `externalId`.
-- Delete only after deliberate user intent. `artifacts delete --confirm-delete` removes the artifact, revisions, shares, snapshots, and associated retry records. `assets delete --confirm-delete` removes the live managed asset and invalidates its standalone public URL; deleting a public image also requires `assets:share`, while pinned share snapshots may retain referenced bytes.
+- Delete only after deliberate user intent. `artifacts delete --confirm-delete` removes the artifact, revisions, shares, snapshots, and associated retry records. Asset deletion belongs to the separate `higantic-assets` skill.
 - HTML page deletion is not exposed. Delete contained artifacts individually.
 
 ## Sharing is opt-in
 
 Never publish stable visibility, change the live content of an already-public artifact, or create/rotate a pinned link unless the user explicitly asks. Sharing and public-content replacement require the non-default `html_artifacts:share` scope and server support. Artifact create/upsert never changes private visibility to public.
-
-Standalone managed images are also private by default. Publish only an explicitly approved PNG/JPEG/WebP/GIF with `assets make-public --confirm-public-sharing` and the non-default `assets:share` scope. Return the stable `/i/{assetId}` URL from the response; it is a no-store/noindex full-fit viewer that proxies the bytes. `assets make-private` revokes standalone access immediately without affecting published artifact snapshots.
 
 - `visibility get` reads normalized private/public state, stable public URL, version, and update time with read scope.
 - `visibility set --visibility public` requires `--confirm-public-sharing`; the stable `/p/{artifactId}` URL follows the current revision until made private.
@@ -65,16 +63,6 @@ higantic skills install
 higantic skills install --json
 python3 scripts/higantic_html.py pages list
 python3 scripts/higantic_html.py pages create --label "Visual reports" --idempotency-key "project:visual-reports-page"
-python3 scripts/higantic_html.py assets list
-python3 scripts/higantic_html.py assets show --asset-id ASSET_ID
-python3 scripts/higantic_html.py assets targets list
-python3 scripts/higantic_html.py assets targets status
-python3 scripts/higantic_html.py assets targets use uploadthing
-python3 scripts/higantic_html.py assets upload --file ./hero.png
-python3 scripts/higantic_html.py assets upload --file ./hero.png --target higantic
-python3 scripts/higantic_html.py assets make-public --asset-id ASSET_ID --confirm-public-sharing
-python3 scripts/higantic_html.py assets make-private --asset-id ASSET_ID
-python3 scripts/higantic_html.py assets delete --asset-id ASSET_ID --confirm-delete
 python3 scripts/higantic_html.py artifacts list --page-id PAGE_ID
 python3 scripts/higantic_html.py artifacts create --page-id PAGE_ID --title "Release plan" --external-id "project:release-plan" --html-file plan.html --idempotency-key "project:release-plan:create"
 python3 scripts/higantic_html.py artifacts lookup --page-id PAGE_ID --external-id "project:release-plan"

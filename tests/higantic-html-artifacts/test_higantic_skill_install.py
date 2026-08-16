@@ -48,6 +48,26 @@ class ParserTests(unittest.TestCase):
         login = parser.parse_args(["auth", "login", "--no-skill-offer"])
         self.assertTrue(login.no_skill_offer)
 
+    def test_setup_panel_has_a_styled_tty_and_ascii_safe_fallback(self):
+        tty = mock.Mock()
+        tty.isatty.return_value = True
+        tty.encoding = "utf-8"
+        with mock.patch.dict(os.environ, {"TERM": "xterm-256color"}, clear=False):
+            with mock.patch.dict(os.environ, {"NO_COLOR": ""}, clear=False):
+                del os.environ["NO_COLOR"]
+                styled = HTML.setup_panel(tty)
+        self.assertIn("\x1b[", styled)
+        self.assertIn("╭─ HiGantic setup", styled)
+        self.assertIn("01/", INSTALLER._paint("01/03", "cyan", stream=tty))
+
+        ascii_stream = mock.Mock()
+        ascii_stream.isatty.return_value = False
+        ascii_stream.encoding = "ascii"
+        fallback = HTML.setup_panel(ascii_stream)
+        self.assertIn("+- HiGantic setup", fallback)
+        self.assertIn("OK CLI", fallback)
+        self.assertNotIn("\x1b[", fallback)
+
 
 class CatalogAndConsentTests(unittest.TestCase):
     def test_yes_no_prompt_defaults_to_yes_on_enter(self):
@@ -77,17 +97,23 @@ class CatalogAndConsentTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "interactive_required")
 
     def test_interactive_install_asks_for_each_missing_skill(self):
+        stderr = io.StringIO()
         with mock.patch.object(INSTALLER, "SKILL_CATALOG", FIXTURE_CATALOG):
             with mock.patch.object(INSTALLER, "_skill_is_installed", return_value=False):
                 with mock.patch.object(INSTALLER, "_interactive_terminal", return_value=True):
                     with mock.patch.object(INSTALLER, "_ask_yes_no", side_effect=[True, False]) as ask:
                         with mock.patch.object(INSTALLER, "_install") as install:
-                            with contextlib.redirect_stderr(io.StringIO()):
+                            with contextlib.redirect_stderr(stderr):
                                 result = INSTALLER.install_skills()
         self.assertEqual(ask.call_count, 2)
         install.assert_called_once_with(FIXTURE_CATALOG[0])
         self.assertEqual(result["installed"], ["higantic-html-artifacts"])
         self.assertEqual(result["declined"], ["higantic-research"])
+        output = stderr.getvalue()
+        self.assertIn("01/02  HTML Artifacts", output)
+        self.assertIn("02/02  Research", output)
+        self.assertIn("✓ Installed globally", output)
+        self.assertIn("— Skipped", output)
 
     def test_post_login_offer_is_silent_without_missing_skills_and_reviews_each_missing_skill(self):
         with mock.patch.object(INSTALLER, "_interactive_terminal", return_value=True):
@@ -156,7 +182,7 @@ class MainFlowTests(unittest.TestCase):
     def test_setup_confirms_cli_and_reviews_every_public_skill(self):
         result = {
             "scope": "global",
-            "installed": ["higantic-html-artifacts", "higantic-excalidraw"],
+            "installed": ["higantic-html-artifacts", "higantic-assets", "higantic-excalidraw"],
             "alreadyInstalled": [],
             "declined": [],
             "failed": [],
@@ -167,16 +193,19 @@ class MainFlowTests(unittest.TestCase):
                 with contextlib.redirect_stdout(stdout):
                     self.assertEqual(HTML.main(), 0)
         output = stdout.getvalue()
-        self.assertIn("installed successfully", output)
-        self.assertIn("Public skills  2", output)
-        self.assertIn("HTML Artifacts, Excalidraw Canvas", output)
+        self.assertIn("HiGantic setup", output)
+        self.assertIn("CLI 1.8.2 ready", output)
+        self.assertIn("Public skills  3", output)
+        self.assertIn("Enter installs · n skips", output)
+        self.assertIn("Skill setup complete", output)
+        self.assertIn("HTML Artifacts, Managed Assets, Excalidraw Canvas", output)
         install.assert_called_once_with(assume_yes=False)
 
     def test_setup_yes_is_noninteractive(self):
         result = {
             "scope": "global",
             "installed": [],
-            "alreadyInstalled": ["higantic-html-artifacts", "higantic-excalidraw"],
+            "alreadyInstalled": ["higantic-html-artifacts", "higantic-assets", "higantic-excalidraw"],
             "declined": [],
             "failed": [],
         }
@@ -232,7 +261,11 @@ class MainFlowTests(unittest.TestCase):
             with mock.patch.object(HTML, "install_skills", return_value=result):
                 with contextlib.redirect_stdout(stdout):
                     self.assertEqual(HTML.main(), 0)
-        self.assertEqual(stdout.getvalue(), "HTML Artifacts is already installed globally.\n")
+        output = stdout.getvalue()
+        self.assertIn("Skill setup complete", output)
+        self.assertIn("Ready", output)
+        self.assertIn("HTML Artifacts", output)
+        self.assertNotIn("\x1b[", output)
 
     def test_explicit_skills_command_supports_json_for_scripts(self):
         result = {

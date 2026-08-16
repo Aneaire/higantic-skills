@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the standalone `higantic-assets` skill for managed-image discovery, upload, storage-target selection, opt-in standalone visibility, and deliberate deletion; HTML Artifacts now owns only artifact lifecycle and embedding existing `higantic-asset://` references.
+- Expanded `higantic setup` to offer HTML Artifacts, Managed Assets, and Excalidraw as three independent `[Y/n]` installations.
 - Added `higantic setup` with an explicit successful-installation confirmation and a complete public-skill walkthrough; interactive skill prompts now use `[Y/n]`, so pressing Enter accepts each installation while noninteractive commands still require `--yes`.
 - Added the standalone `@higantic/cli` npm application with its own `higantic` command, installed independently from HTML Artifacts and Excalidraw agent skills; the bundled Python runtime still requires Python 3.9+, and the HTML skill retains a compatibility launcher for existing users.
 - Added English-by-default auth results with explicit `--json`, non-secret `auth profiles`, read-only `doctor` diagnostics, `--version`, device-approval progress, contextual recovery hints, and bounded control-free child-installer failure details.

@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
   "slug": "higantic-html-artifacts",
-  "updatedAt": "2026-08-13T00:00:00Z",
+  "updatedAt": "2026-08-16T00:00:00Z",
   "supportedCapabilities": [
     "html-pages",
     "html-artifacts",
     "html-revisions",
-    "managed-assets",
     "private-artifact-urls",
     "stable-public-visibility",
     "capability-shares"
@@ -14,13 +13,6 @@
   "supportedCommands": [
     "pages.list",
     "pages.create",
-    "assets.list",
-    "assets.show",
-    "assets.upload",
-    "assets.delete",
-    "assets.targets",
-    "assets.make_public",
-    "assets.make_private",
     "artifacts.list",
     "artifacts.create",
     "artifacts.lookup",
@@ -44,9 +36,6 @@
     "html_artifacts:read",
     "html_artifacts:write",
     "html_artifacts:share",
-    "assets:read",
-    "assets:write",
-    "assets:share",
     "html_pages:create"
   ],
   "features": {
@@ -61,7 +50,6 @@
   },
   "limits": {
     "artifactSourceBytes": 256000,
-    "assetUploadBytes": 10485760,
     "revisionsPerArtifact": 100,
     "requestsPerMinutePerKey": 120,
     "writesPerMinutePerKey": 30

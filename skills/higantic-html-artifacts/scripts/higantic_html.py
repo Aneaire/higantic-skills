@@ -113,6 +113,24 @@ def detail_lines(items: list[tuple[str, Any]]) -> list[str]:
     return [f"  {paint(label.ljust(width), 'dim')}  {value}" for label, value in visible]
 
 
+def setup_panel(stream: Any = None) -> str:
+    target = sys.stdout if stream is None else stream
+    rail = paint(glyph("│", "|", target), "cyan", stream=target)
+    ready = paint(glyph("✓", "OK", target), "green", "bold", stream=target)
+    separator = glyph("·", "-", target)
+    return "\n".join([
+        paint(f"{glyph('╭─', '+-', target)} HiGantic setup", "cyan", "bold", stream=target),
+        f"{rail}  {ready} {paint(f'CLI {CLI_VERSION} ready', 'bold', stream=target)}",
+        f"{rail}",
+        f"{rail}  {paint('Command', 'dim', stream=target)}        higantic",
+        f"{rail}  {paint('Public skills', 'dim', stream=target)}  {len(SKILL_CATALOG)}",
+        paint(glyph("╰────────────────────────", "+------------------------", target), "cyan", stream=target),
+        "",
+        paint("Choose optional agent skills", "bold", stream=target),
+        paint(f"Enter installs {separator} n skips", "dim", stream=target),
+    ])
+
+
 class HiGanticArgumentParser(argparse.ArgumentParser):
     """Argparse with concise, branded recovery instead of internal parser prose."""
 
@@ -1076,14 +1094,7 @@ def main() -> int:
     try:
         args = build_parser().parse_args()
         if args.group == "setup":
-            print(
-                "\n".join([
-                    status_line(f"HiGantic CLI {CLI_VERSION} installed successfully", "green"),
-                    *detail_lines([("Command", "higantic"), ("Public skills", len(SKILL_CATALOG))]),
-                    "\nReview the available agent skills:",
-                ]),
-                flush=True,
-            )
+            print(setup_panel(), flush=True)
             result = install_skills(assume_yes=args.yes)
             print(format_install_result(safe_output(result)))
             return 2 if result["failed"] else 0

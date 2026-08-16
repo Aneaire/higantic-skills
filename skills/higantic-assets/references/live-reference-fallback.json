@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "slug": "higantic-assets",
+  "updatedAt": "2026-08-16T00:00:00Z",
+  "supportedCapabilities": [
+    "managed-assets",
+    "asset-storage-targets",
+    "standalone-asset-visibility"
+  ],
+  "supportedCommands": [
+    "assets.list",
+    "assets.show",
+    "assets.upload",
+    "assets.delete",
+    "assets.targets",
+    "assets.make_public",
+    "assets.make_private"
+  ],
+  "scopes": [
+    "assets:read",
+    "assets:write",
+    "assets:share"
+  ],
+  "features": {
+    "assetStorageTargetsSupported": true,
+    "stablePublicVisibilitySupported": true,
+    "remoteAssetImportSupported": false,
+    "publicAssetDeletionRequiresShareScope": true,
+    "pinnedArtifactSnapshotsIndependent": true
+  },
+  "limits": {
+    "assetUploadBytes": 10485760,
+    "requestsPerMinutePerKey": 120,
+    "writesPerMinutePerKey": 30
+  }
+}

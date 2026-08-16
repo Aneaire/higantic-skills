@@ -29,7 +29,7 @@ export PATH="$PWD/scripts:$PATH"   # or use the installed scripts/ directory
 higantic auth login                # ten-minute browser approval flow
 ```
 
-Login preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. Standard private artifact and Canvas scopes are requested by default; the high-trust `html_artifacts:share` and `assets:share` scopes are requested only with explicit repeated `--scope` flags and are never preselected. After success, the CLI may offer to review missing public skills; each install is optional and has its own confirmation. Use `--no-skill-offer` to suppress the offer.
+Login preflights secure storage, shows a ten-minute browser verification URL and code, reports the approval wait and expiry, and waits for explicit approval of one active agent and a reviewed scope subset. The high-trust `html_artifacts:share` scope is requested only with an explicit repeated `--scope` flag and is never preselected. After success, the CLI may offer to review missing public skills; each install is optional and has its own confirmation. Use `--no-skill-offer` to suppress the offer.
 
 Issued keys are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service and are returned once; the CLI never prints them and has no API-key argument. Never ask a user to paste a key into a prompt. Protected-file storage is explicit only with `--storage file --allow-protected-file`.
 
@@ -60,15 +60,11 @@ If any member of the triple is set, all three are required, and the complete tri
 Grant only the scopes needed:
 
 - `html_artifacts:read` and `html_artifacts:write`
-- `assets:read` and `assets:write`
-- `assets:share` only for explicit standalone image publication or deletion of an already-public image
 - `html_pages:create` when page creation is required
 - `excalidraw:read` and `excalidraw:write`
 - `excalidraw:share` only when stable Canvas viewer links must be published
 - `excalidraw_pages:create` when Canvas page creation is required
 - `html_artifacts:share` only for deliberate stable publication or pinned capability links
-
-Existing keys may report legacy `html_assets:*` grants; the server keeps those grants compatible on asset routes, while CLI 1.8.0 and later request canonical `assets:*` scopes.
 
 ## Common errors
 

@@ -14,7 +14,7 @@ Repository Markdown and code are canonical. The artifact is derivative and must 
 
 If a fact cannot be tied to current repository source, label it as an assumption or recommendation. Do not let a stale artifact silently override newer code or documentation.
 
-Allowed content is static HTML and inline CSS. Credential-free absolute HTTPS links are retained and forced to open safely in a new tab. Images may use `higantic-asset://<assetId>` references returned by `assets list`/`assets upload`; data-image sources may survive for compatibility, but managed assets are preferred.
+Allowed content is static HTML and inline CSS. Credential-free absolute HTTPS links are retained and forced to open safely in a new tab. Images may use existing `higantic-asset://<assetId>` references returned by the separate `higantic-assets` workflow; data-image sources may survive for compatibility, but managed assets are preferred.
 
 Do not include JavaScript, event handlers, forms or form controls, HTTP/relative/credential-bearing links, iframes, objects, embeds, SVG, canvas, audio/video, arbitrary remote images/fonts/assets, CSS `url()`, `@import`, meta refresh, or arbitrary CSP. HiGantic sanitizes all writes and renders them in an opaque sandbox; only managed image storage origins and user-initiated safe HTTPS links are available.
 
